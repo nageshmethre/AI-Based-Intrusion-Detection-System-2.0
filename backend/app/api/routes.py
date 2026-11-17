@@ -114,6 +114,78 @@ def get_soc_overview(db: Session = Depends(get_db)):
     attack_rows = db.query(ThreatAlert.threat_category, func.count(ThreatAlert.id)).group_by(ThreatAlert.threat_category).all()
     attack_distribution = {cat: cnt for cat, cnt in attack_rows}
 
+    # Top Source IPs
+    top_ip_rows = (
+        db.query(NetworkEvent.src_ip, func.count(NetworkEvent.id).label("cnt"))
+        .group_by(NetworkEvent.src_ip)
+        .order_by(desc("cnt"))
+        .limit(5)
+        .all()
+    )
+    top_source_ips = [
+        {
+            "ip": ip,
+            "count": cnt,
+            "percentage": round((cnt / total_events * 100), 1) if total_events > 0 else 0.0
+        }
+        for ip, cnt in top_ip_rows
+    ]
+
+    # Top Destination Ports
+    port_names = {
+        443: "443 (HTTPS)",
+        53: "53 (DNS)",
+        80: "80 (HTTP)",
+        22: "22 (SSH)",
+        3389: "3389 (RDP)",
+        21: "21 (FTP)",
+        23: "23 (Telnet)",
+        8080: "8080 (Proxy)",
+        5222: "5222 (XMPP)"
+    }
+    top_port_rows = (
+        db.query(NetworkEvent.dst_port, func.count(NetworkEvent.id).label("cnt"))
+        .filter(NetworkEvent.dst_port > 0)
+        .group_by(NetworkEvent.dst_port)
+        .order_by(desc("cnt"))
+        .limit(5)
+        .all()
+    )
+    top_dest_ports = [
+        {
+            "port": p,
+            "label": port_names.get(p, f"{p} (Custom)"),
+            "count": cnt,
+            "percentage": round((cnt / total_events * 100), 1) if total_events > 0 else 0.0
+        }
+        for p, cnt in top_port_rows
+    ]
+
+    # Recent Threat Geolocation Sources for Threat Map
+    threat_ips = (
+        db.query(ThreatAlert.src_ip, ThreatAlert.threat_category, ThreatAlert.severity)
+        .order_by(desc(ThreatAlert.timestamp))
+        .limit(10)
+        .all()
+    )
+    threat_map_nodes = []
+    seen_ips = set()
+    for src_ip, cat, sev in threat_ips:
+        if src_ip in seen_ips:
+            continue
+        seen_ips.add(src_ip)
+        intel = get_ip_intel(src_ip)
+        threat_map_nodes.append({
+            "ip": src_ip,
+            "category": cat,
+            "severity": sev,
+            "country": intel.get("country", "Unknown"),
+            "city": intel.get("city", "Unknown"),
+            "lat": intel.get("lat", 20.0),
+            "lon": intel.get("lon", 0.0),
+            "is_malicious": True
+        })
+
     # Recent Alerts
     recent_alerts_objs = db.query(ThreatAlert).order_by(desc(ThreatAlert.timestamp)).limit(6).all()
     recent_alerts = [
@@ -165,6 +237,19 @@ def get_soc_overview(db: Session = Depends(get_db)):
         "severity_breakdown": severity_breakdown,
         "protocol_distribution": protocol_distribution,
         "attack_distribution": attack_distribution,
+        "top_source_ips": top_source_ips,
+        "top_dest_ports": top_dest_ports,
+        "threat_map_nodes": threat_map_nodes,
+        "traffic_flow_stats": {
+            "total_flows": total_events,
+            "normal": normal_events,
+            "suspicious": malicious_events,
+            "dos": attack_distribution.get("DoS", 0),
+            "portscan": attack_distribution.get("PortScan", 0),
+            "bruteforce": attack_distribution.get("BruteForce", 0),
+            "botnet": attack_distribution.get("Botnet", 0),
+            "active_alerts": open_alerts
+        },
         "recent_alerts": recent_alerts,
         "recent_events": recent_events
     }
@@ -447,6 +532,29 @@ def list_system_logs(
         }
         for l in logs
     ]
+
+
+@router.get("/logs/download")
+def download_system_logs(db: Session = Depends(get_db)):
+    """Download forensic security audit logs as a text file."""
+    from fastapi.responses import Response
+    logs = db.query(SystemLog).order_by(desc(SystemLog.timestamp)).limit(1000).all()
+    output_lines = [
+        "==================================================================",
+        "          CYBERSOC IDS / IPS FORENSIC AUDIT LOG EXPORT",
+        f"          Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "==================================================================",
+        ""
+    ]
+    for l in logs:
+        output_lines.append(f"[{l.timestamp.strftime('%Y-%m-%d %H:%M:%S')}] [{l.level:<7}] [{l.source:<12}] {l.message}")
+    
+    content = "\n".join(output_lines)
+    return Response(
+        content=content,
+        media_type="text/plain",
+        headers={"Content-Disposition": "attachment; filename=cybersoc_security_audit.log"}
+    )
 
 
 @router.post("/logs/ingest")

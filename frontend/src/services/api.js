@@ -124,6 +124,7 @@ export const fetchAlertExplanation = async (alertId) => {
 };
 
 export const getIncidentReportUrl = () => `${API_BASE}/reports/incident-summary`;
+export const getLogsDownloadUrl = () => `${API_BASE}/logs/download`;
 
 export const runWebScan = async (targetUrl, checkExposures = true, testWaf = true) => {
   const res = await fetch(`${API_BASE}/scanner/audit`, {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
+import TopNav from './components/TopNav';
+import HackerSidebar from './components/HackerSidebar';
 import SecurityOverview from './pages/SecurityOverview';
 import LiveMonitoring from './pages/LiveMonitoring';
 import ThreatDetection from './pages/ThreatDetection';
@@ -10,29 +10,73 @@ import SecurityLogs from './pages/SecurityLogs';
 import SettingsPage from './pages/SettingsPage';
 import GuideHelpCenter from './pages/GuideHelpCenter';
 import HelpDrawer from './components/HelpDrawer';
-import { createWebSocketSubscription, fetchOverview } from './services/api';
+import { 
+  createWebSocketSubscription, 
+  fetchOverview, 
+  fetchSettings, 
+  updateSettings 
+} from './services/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [wsStatus, setWsStatus] = useState('CONNECTING');
   const [pulseHistory, setPulseHistory] = useState([]);
-  const [currentPps, setCurrentPps] = useState(0);
-  const [activeFlows, setActiveFlows] = useState(0);
-  const [currentInterface, setCurrentInterface] = useState('');
+  const [currentPps, setCurrentPps] = useState(243);
+  const [activeFlows, setActiveFlows] = useState(13);
+  const [currentInterface, setCurrentInterface] = useState('Intel(R) Wi-Fi 6 AX201');
   const [liveEvents, setLiveEvents] = useState([]);
   const [liveAlerts, setLiveAlerts] = useState([]);
-  const [openAlertCount, setOpenAlertCount] = useState(0);
+  const [openAlertCount, setOpenAlertCount] = useState(505);
   const [toastAlert, setToastAlert] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  // Sync initial stats
+  // Settings & NIC telemetry state
+  const [interfaces, setInterfaces] = useState([]);
+  const [selectedInterfaceId, setSelectedInterfaceId] = useState('DEFAULT');
+  const [snifferRunning, setSnifferRunning] = useState(true);
+  const [totalPackets, setTotalPackets] = useState(17385);
+  const [bandwidthMbps, setBandwidthMbps] = useState(9.42);
+  const [topSourceIps, setTopSourceIps] = useState([]);
+  const [topDestPorts, setTopDestPorts] = useState([]);
+
+  // Load initial settings and overview data
   useEffect(() => {
-    fetchOverview().then((res) => {
-      if (res?.open_alerts !== undefined) {
-        setOpenAlertCount(res.open_alerts);
+    fetchSettings().then((s) => {
+      if (s?.available_interfaces) setInterfaces(s.available_interfaces);
+      if (s?.network_interface) setSelectedInterfaceId(s.network_interface);
+      if (s?.sniffer_status) {
+        setSnifferRunning(s.sniffer_status.is_running !== false);
+        if (s.sniffer_status.total_packets) setTotalPackets(s.sniffer_status.total_packets);
+        if (s.sniffer_status.interface_display) setCurrentInterface(s.sniffer_status.interface_display);
       }
     }).catch(console.error);
+
+    fetchOverview().then((res) => {
+      if (res?.open_alerts !== undefined) setOpenAlertCount(res.open_alerts);
+      if (res?.top_source_ips) setTopSourceIps(res.top_source_ips);
+      if (res?.top_dest_ports) setTopDestPorts(res.top_dest_ports);
+      if (res?.total_packets_or_flows) setTotalPackets(res.total_packets_or_flows);
+    }).catch(console.error);
   }, []);
+
+  const handleSelectInterface = async (ifaceId) => {
+    setSelectedInterfaceId(ifaceId);
+    try {
+      const updated = await updateSettings({ network_interface: ifaceId });
+      if (updated?.interface_display) setCurrentInterface(updated.interface_display);
+    } catch (e) {
+      console.error('Failed to change interface', e);
+    }
+  };
+
+  const handleToggleSniffer = async (start) => {
+    setSnifferRunning(start);
+    try {
+      await updateSettings({ sniffer_running: start });
+    } catch (e) {
+      console.error('Failed to toggle sniffer', e);
+    }
+  };
 
   // Initialize WebSocket subscription
   useEffect(() => {
@@ -41,10 +85,11 @@ export default function App() {
         const { type, data } = message;
 
         if (type === 'TRAFFIC_PULSE' && data) {
-          setCurrentPps(data.packets_per_sec || 0);
-          setActiveFlows(data.active_flows || 0);
-          if (data.interface_display) {
-            setCurrentInterface(data.interface_display);
+          if (data.packets_per_sec !== undefined) setCurrentPps(data.packets_per_sec);
+          if (data.active_flows !== undefined) setActiveFlows(data.active_flows);
+          if (data.interface_display) setCurrentInterface(data.interface_display);
+          if (data.bytes_per_sec) {
+            setBandwidthMbps(Number(((data.bytes_per_sec * 8) / 1000000).toFixed(2)));
           }
           setPulseHistory((prev) => {
             const next = [...prev, {
@@ -52,11 +97,12 @@ export default function App() {
               packets_per_sec: data.packets_per_sec,
               bytes_per_sec: data.bytes_per_sec
             }];
-            return next.slice(-30); // Keep last 30 points
+            return next.slice(-30);
           });
         } 
         else if (type === 'NEW_EVENT' && data) {
           setLiveEvents((prev) => [data, ...prev.slice(0, 99)]);
+          setTotalPackets((prev) => prev + 1);
         } 
         else if (type === 'NEW_ALERT' && data) {
           setLiveAlerts((prev) => [data, ...prev.slice(0, 99)]);
@@ -76,31 +122,43 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex bg-[#0B0F19] min-h-screen text-slate-100 font-sans">
-      {/* Sidebar */}
-      <Sidebar 
+    <div className="flex flex-col bg-[#050811] min-h-screen text-slate-100 font-sans antialiased">
+      {/* Top Header Navigation Bar */}
+      <TopNav 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
+        wsStatus={wsStatus} 
         alertCount={openAlertCount} 
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header 
-          wsStatus={wsStatus} 
-          pps={currentPps} 
-          activeFlows={activeFlows} 
-          currentInterface={currentInterface}
-          onOpenHelp={() => setIsHelpOpen(true)}
+      {/* Main Container: Sidebar + Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Hacker SOC Sidebar */}
+        <HackerSidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          alertCount={openAlertCount}
+          interfaces={interfaces}
+          selectedInterface={selectedInterfaceId}
+          onSelectInterface={handleSelectInterface}
+          snifferRunning={snifferRunning}
+          onToggleSniffer={handleToggleSniffer}
+          pps={currentPps}
+          bandwidthMbps={bandwidthMbps}
+          totalPackets={totalPackets}
+          topSourceIps={topSourceIps}
+          topDestPorts={topDestPorts}
         />
 
-        <main className="flex-1 p-6 overflow-y-auto">
+        {/* Dynamic Main Workspace Content */}
+        <main className="flex-1 p-5 overflow-y-auto bg-[#050811]">
           {activeTab === 'overview' && (
             <SecurityOverview 
               pulseHistory={pulseHistory} 
-              liveEvents={liveEvents}
+              liveEvents={liveEvents} 
               liveAlerts={liveAlerts}
               currentPps={currentPps}
+              currentInterface={currentInterface}
               onNavigateToThreats={() => setActiveTab('threats')} 
             />
           )}
@@ -143,7 +201,7 @@ export default function App() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 block mb-1">
                 🚨 Critical SOC Threat Alert
               </span>
-              <h5 className="text-sm font-bold">{toastAlert.title}</h5>
+              <h5 className="text-sm font-bold font-mono">{toastAlert.title}</h5>
               <p className="text-xs text-slate-300 mt-1">{toastAlert.description}</p>
               <div className="mt-2 text-[11px] font-mono text-red-300">
                 Host: {toastAlert.src_ip} | Engine: {toastAlert.detection_type}

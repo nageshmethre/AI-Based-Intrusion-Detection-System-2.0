@@ -41,6 +41,8 @@ def get_ip_intel(ip_str: str) -> Dict[str, Any]:
             "country_code": "LAB",
             "city": "Isolated Test Environment",
             "isp": "Virtual Npcap Loopback",
+            "lat": 20.5937,
+            "lon": 78.9629,
             "is_malicious_reputation": False,
             "threat_risk_score": 10,
             "flag_emoji": "🧪"
@@ -56,6 +58,8 @@ def get_ip_intel(ip_str: str) -> Dict[str, Any]:
             "country_code": "LAN",
             "city": "Internal Subnet",
             "isp": "Local Area Network",
+            "lat": 28.6139,
+            "lon": 77.2090,
             "is_malicious_reputation": False,
             "threat_risk_score": 5,
             "flag_emoji": "🏠"
@@ -65,7 +69,7 @@ def get_ip_intel(ip_str: str) -> Dict[str, Any]:
 
     # Public IP: fetch from free IP-API with quick timeout
     try:
-        url = f"http://ip-api.com/json/{ip_clean}?fields=status,country,countryCode,city,isp,org,as"
+        url = f"http://ip-api.com/json/{ip_clean}?fields=status,country,countryCode,city,isp,org,as,lat,lon"
         req = urllib.request.Request(url, headers={"User-Agent": "CyberSOC-IDS/2.0"})
         with urllib.request.urlopen(req, timeout=2.0) as resp:
             data = json.loads(resp.read().decode())
@@ -78,6 +82,8 @@ def get_ip_intel(ip_str: str) -> Dict[str, Any]:
                     "city": data.get("city", "Unknown City"),
                     "isp": data.get("isp", data.get("org", "Unknown Provider")),
                     "as_number": data.get("as", "N/A"),
+                    "lat": data.get("lat", 37.751),
+                    "lon": data.get("lon", -122.42),
                     "is_malicious_reputation": False,
                     "threat_risk_score": 35,
                     "flag_emoji": "🌐"
@@ -95,6 +101,8 @@ def get_ip_intel(ip_str: str) -> Dict[str, Any]:
         "country_code": "EXT",
         "city": "Remote Node",
         "isp": "WAN Gateway",
+        "lat": 38.8951,
+        "lon": -77.0364,
         "threat_risk_score": 25,
         "flag_emoji": "🌐"
     }
