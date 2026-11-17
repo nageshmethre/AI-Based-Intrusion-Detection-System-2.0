@@ -20,12 +20,29 @@ from backend.app.intelligence.geoip import get_ip_intel
 from backend.app.ml.explainer import explain_flow_prediction
 from backend.app.reports.exporter import generate_executive_html_report
 from backend.app.notifications.webhook import notification_dispatcher
+from backend.app.scanner.web_scanner import audit_website
 from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/api")
 
 
 # Pydantic schemas
+class WebScanRequest(BaseModel):
+    target_url: str
+    check_exposures: Optional[bool] = True
+    test_waf: Optional[bool] = True
+
+
+class WebScanRecordAlertRequest(BaseModel):
+    title: str
+    severity: str
+    description: str
+    target_url: str
+    category: Optional[str] = "Web Application Attack"
+    evidence: Optional[str] = ""
+    remediation: Optional[str] = ""
+
+
 class AlertStatusUpdate(BaseModel):
     status: str  # OPEN, INVESTIGATING, RESOLVED, FALSE_POSITIVE
 
@@ -707,4 +724,75 @@ def test_notification():
         "message": "Webhook test simulated successfully (set webhook_url in Settings to deliver to live Discord/Telegram).",
         "payload": sample_alert
     }
+
+
+# ==========================================
+# 6. Web Application Attack Scanner & Auditor
+# ==========================================
+
+@router.post("/scanner/audit")
+def run_web_security_audit(req: WebScanRequest):
+    """Conduct defensive web attack scanning, OWASP security header audit and exposure testing."""
+    if not req.target_url or not req.target_url.strip():
+        raise HTTPException(status_code=400, detail="Target URL cannot be empty")
+    
+    result = audit_website(
+        target_url=req.target_url.strip(),
+        check_exposures=req.check_exposures if req.check_exposures is not None else True,
+        test_waf=req.test_waf if req.test_waf is not None else True
+    )
+    return result
+
+
+@router.post("/scanner/record-alert")
+def record_web_scan_alert(req: WebScanRecordAlertRequest, db: Session = Depends(get_db)):
+    """Record a critical finding from web attack scanning directly into the SOC Threat Alert database."""
+    from urllib.parse import urlparse
+    import socket
+
+    parsed = urlparse(req.target_url)
+    hostname = parsed.hostname or "127.0.0.1"
+    try:
+        resolved_ip = socket.gethostbyname(hostname)
+    except Exception:
+        resolved_ip = "127.0.0.1"
+
+    alert = ThreatAlert(
+        title=req.title,
+        severity=req.severity.upper() if req.severity else "HIGH",
+        status="OPEN",
+        src_ip=resolved_ip,
+        dst_ip=settings.HOST,
+        dst_port=parsed.port or (443 if parsed.scheme == "https" else 80),
+        threat_category=req.category or "Web Attack",
+        detection_type="RULE_BASED",
+        confidence=0.95,
+        description=req.description,
+        details_json={
+            "target_url": req.target_url,
+            "evidence": req.evidence,
+            "remediation": req.remediation,
+            "origin": "CyberSOC Web Attack Scanner"
+        }
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+
+    # Dispatch notification if critical/high
+    notification_dispatcher.send_alert({
+        "title": alert.title,
+        "severity": alert.severity,
+        "src_ip": alert.src_ip,
+        "threat_category": alert.threat_category,
+        "description": alert.description,
+        "detection_type": alert.detection_type
+    })
+
+    return {
+        "success": True,
+        "message": f"Security finding recorded as Threat Alert #{alert.id}",
+        "alert_id": alert.id
+    }
+
 

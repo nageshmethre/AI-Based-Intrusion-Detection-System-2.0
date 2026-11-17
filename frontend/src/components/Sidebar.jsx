@@ -7,13 +7,15 @@ import {
   FileText, 
   Settings,
   Radio,
-  BookOpen
+  BookOpen,
+  Globe
 } from 'lucide-react';
 
 const navItems = [
   { id: 'overview', label: 'Security Overview', icon: ShieldCheck },
   { id: 'monitoring', label: 'Live Network Monitoring', icon: Activity },
   { id: 'threats', label: 'Threat Detection', icon: AlertTriangle },
+  { id: 'web-scanner', label: 'Web Attack Scanner', icon: Globe },
   { id: 'ai-model', label: 'AI Model Performance', icon: Cpu },
   { id: 'logs', label: 'Security Logs', icon: FileText },
   { id: 'settings', label: 'Settings', icon: Settings },

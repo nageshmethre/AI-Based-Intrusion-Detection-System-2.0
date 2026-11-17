@@ -4,6 +4,7 @@ import Header from './components/Header';
 import SecurityOverview from './pages/SecurityOverview';
 import LiveMonitoring from './pages/LiveMonitoring';
 import ThreatDetection from './pages/ThreatDetection';
+import WebAttackScanner from './pages/WebAttackScanner';
 import ModelPerformance from './pages/ModelPerformance';
 import SecurityLogs from './pages/SecurityLogs';
 import SettingsPage from './pages/SettingsPage';
@@ -108,6 +109,9 @@ export default function App() {
           )}
           {activeTab === 'threats' && (
             <ThreatDetection liveAlerts={liveAlerts} />
+          )}
+          {activeTab === 'web-scanner' && (
+            <WebAttackScanner onNavigateToThreats={() => setActiveTab('threats')} />
           )}
           {activeTab === 'ai-model' && (
             <ModelPerformance onNavigateTab={(tab) => setActiveTab(tab)} />

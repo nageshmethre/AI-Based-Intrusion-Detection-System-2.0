@@ -125,6 +125,33 @@ export const fetchAlertExplanation = async (alertId) => {
 
 export const getIncidentReportUrl = () => `${API_BASE}/reports/incident-summary`;
 
+export const runWebScan = async (targetUrl, checkExposures = true, testWaf = true) => {
+  const res = await fetch(`${API_BASE}/scanner/audit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      target_url: targetUrl,
+      check_exposures: checkExposures,
+      test_waf: testWaf,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Web security audit failed');
+  }
+  return res.json();
+};
+
+export const recordWebScanAlert = async (data) => {
+  const res = await fetch(`${API_BASE}/scanner/record-alert`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to record web scan threat alert');
+  return res.json();
+};
+
 export const testWebhook = async () => {
   const res = await fetch(`${API_BASE}/notifications/test`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to test webhook');
