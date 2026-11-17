@@ -21,6 +21,8 @@ from backend.app.capture.flow import FlowAggregator
 from backend.app.capture.sniffer import PacketSniffer
 from backend.app.api.routes import router as api_router
 from backend.app.api.websockets import ws_router, ws_manager
+from backend.app.defense.firewall import active_defense_manager
+from backend.app.notifications.webhook import notification_dispatcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("SOC_Core")
@@ -130,6 +132,16 @@ def handle_completed_flow(flow_dict: dict):
 
             if alert_dict:
                 ws_manager.dispatch_from_thread("NEW_ALERT", alert_dict)
+                # Active Defense Auto-Block & Webhook Notification
+                if active_defense_manager.auto_block_enabled and alert_dict.get("severity") in ["CRITICAL", "HIGH"]:
+                    active_defense_manager.block_ip(
+                        ip=alert_dict["src_ip"],
+                        reason=f"Automated IPS Defense: {alert_dict['title']}",
+                        threat_category=alert_dict.get("threat_category", "Attack"),
+                        auto_blocked=True
+                    )
+                if notification_dispatcher.enabled:
+                    notification_dispatcher.send_alert(alert_dict)
 
         finally:
             db.close()
@@ -182,6 +194,16 @@ def handle_live_packet(packet_dict: dict):
                     "status": alert_obj.status
                 }
                 ws_manager.dispatch_from_thread("NEW_ALERT", alert_dict)
+                # Active Defense Auto-Block & Webhook Notification
+                if active_defense_manager.auto_block_enabled and alert_dict.get("severity") in ["CRITICAL", "HIGH"]:
+                    active_defense_manager.block_ip(
+                        ip=alert_dict["src_ip"],
+                        reason=f"Automated IPS Defense: {alert_dict['title']}",
+                        threat_category=alert_dict.get("threat_category", "Attack"),
+                        auto_blocked=True
+                    )
+                if notification_dispatcher.enabled:
+                    notification_dispatcher.send_alert(alert_dict)
         finally:
             db.close()
 

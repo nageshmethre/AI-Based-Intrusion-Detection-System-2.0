@@ -77,6 +77,70 @@ export const fetchSystemStatus = async () => {
   return res.json();
 };
 
+export const fetchBlockedIps = async () => {
+  const res = await fetch(`${API_BASE}/defense/blocked-ips`);
+  if (!res.ok) throw new Error('Failed to fetch blocked IPs');
+  return res.json();
+};
+
+export const blockAttackerIp = async (data) => {
+  const res = await fetch(`${API_BASE}/defense/block`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to block IP');
+  return res.json();
+};
+
+export const unblockAttackerIp = async (ip) => {
+  const res = await fetch(`${API_BASE}/defense/unblock`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ip }),
+  });
+  if (!res.ok) throw new Error('Failed to unblock IP');
+  return res.json();
+};
+
+export const toggleAutoBlock = async (enabled) => {
+  const res = await fetch(`${API_BASE}/defense/toggle-auto-block?enabled=${enabled}`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to toggle auto block');
+  return res.json();
+};
+
+export const fetchIpIntel = async (ip) => {
+  const res = await fetch(`${API_BASE}/intel/ip/${encodeURIComponent(ip)}`);
+  if (!res.ok) throw new Error('Failed to fetch IP intelligence');
+  return res.json();
+};
+
+export const fetchAlertExplanation = async (alertId) => {
+  const res = await fetch(`${API_BASE}/ml/explain/${alertId}`);
+  if (!res.ok) throw new Error('Failed to fetch AI decision explanation');
+  return res.json();
+};
+
+export const getIncidentReportUrl = () => `${API_BASE}/reports/incident-summary`;
+
+export const testWebhook = async () => {
+  const res = await fetch(`${API_BASE}/notifications/test`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to test webhook');
+  return res.json();
+};
+
+export const configureWebhook = async (data) => {
+  const res = await fetch(`${API_BASE}/notifications/config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to configure webhook');
+  return res.json();
+};
+
 export const fetchSystemLogs = async (limit = 100, level = '') => {
   let url = `${API_BASE}/logs?limit=${limit}`;
   if (level) url += `&level=${level}`;

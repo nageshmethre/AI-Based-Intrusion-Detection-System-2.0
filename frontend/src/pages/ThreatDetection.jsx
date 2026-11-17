@@ -7,9 +7,13 @@ import {
   Filter, 
   Cpu, 
   FileCode,
-  ExternalLink
+  ExternalLink,
+  Flame,
+  BrainCircuit,
+  Globe
 } from 'lucide-react';
-import { fetchThreatAlerts, updateAlertStatus } from '../services/api';
+import { fetchThreatAlerts, updateAlertStatus, blockAttackerIp } from '../services/api';
+import AiExplainerModal from '../components/AiExplainerModal';
 
 export default function ThreatDetection({ liveAlerts = [] }) {
   const [alerts, setAlerts] = useState([]);
@@ -17,6 +21,8 @@ export default function ThreatDetection({ liveAlerts = [] }) {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  const [explainingAlert, setExplainingAlert] = useState(null);
+  const [blockingIp, setBlockingIp] = useState(null);
 
   const loadAlerts = async () => {
     try {
@@ -52,6 +58,19 @@ export default function ThreatDetection({ liveAlerts = [] }) {
     } catch (e) {
       console.error(e);
       alert('Failed to update alert status');
+    }
+  };
+
+  const handleBlockIp = async (ip, reason) => {
+    if (!ip) return;
+    setBlockingIp(ip);
+    try {
+      const res = await blockAttackerIp(ip, 300, reason || 'Threat Alert Manual Action');
+      alert(`Firewall Defense Active: ${res.message || 'IP Blocked successfully'}`);
+    } catch (e) {
+      alert(`Failed to block IP: ${e.message}`);
+    } finally {
+      setBlockingIp(null);
     }
   };
 
@@ -207,7 +226,28 @@ export default function ThreatDetection({ liveAlerts = [] }) {
                 </div>
 
                 {/* Workflow Actions */}
-                <div className="flex md:flex-col items-center gap-2 pt-2 md:pt-0">
+                <div className="flex md:flex-col items-center gap-2 pt-2 md:pt-0 min-w-[140px]">
+                  {/* IPS Active Defense Button */}
+                  <button
+                    onClick={() => handleBlockIp(alert.src_ip, `${alert.threat_category} detection`)}
+                    disabled={blockingIp === alert.src_ip}
+                    className="px-3 py-1.5 bg-red-700/80 hover:bg-red-600 border border-red-500/50 text-white rounded-lg text-xs font-bold flex items-center shadow transition-all w-full justify-center group"
+                    title="Engage Active Defense: Add inbound blocking rule to Windows Defender Firewall"
+                  >
+                    <Flame className="w-3.5 h-3.5 mr-1.5 text-red-300 animate-pulse" />
+                    {blockingIp === alert.src_ip ? 'Blocking...' : 'Isolate IP'}
+                  </button>
+
+                  {/* AI Explainability Button */}
+                  <button
+                    onClick={() => setExplainingAlert(alert)}
+                    className="px-3 py-1.5 bg-purple-900/40 hover:bg-purple-800/60 border border-purple-500/40 text-purple-200 rounded-lg text-xs font-semibold flex items-center shadow transition-all w-full justify-center"
+                    title="View ML Explainability feature importance breakdown"
+                  >
+                    <BrainCircuit className="w-3.5 h-3.5 mr-1.5 text-purple-400" />
+                    Explain AI
+                  </button>
+
                   {alert.status !== 'RESOLVED' && (
                     <button
                       onClick={() => handleStatusChange(alert.id, 'RESOLVED')}
@@ -247,6 +287,14 @@ export default function ThreatDetection({ liveAlerts = [] }) {
           </div>
         )}
       </div>
+
+      {/* AI Explainability Modal */}
+      {explainingAlert && (
+        <AiExplainerModal
+          alert={explainingAlert}
+          onClose={() => setExplainingAlert(null)}
+        />
+      )}
     </div>
   );
 }

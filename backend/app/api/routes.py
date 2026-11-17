@@ -15,6 +15,12 @@ from backend.app.config import settings
 from backend.app.ml.train import train_model
 from backend.app.ml.dataset_importer import scan_raw_dataset_files, process_authentic_cicids2017
 from backend.app.capture.sniffer import list_available_interfaces
+from backend.app.defense.firewall import active_defense_manager
+from backend.app.intelligence.geoip import get_ip_intel
+from backend.app.ml.explainer import explain_flow_prediction
+from backend.app.reports.exporter import generate_executive_html_report
+from backend.app.notifications.webhook import notification_dispatcher
+from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/api")
 
@@ -22,6 +28,23 @@ router = APIRouter(prefix="/api")
 # Pydantic schemas
 class AlertStatusUpdate(BaseModel):
     status: str  # OPEN, INVESTIGATING, RESOLVED, FALSE_POSITIVE
+
+
+class BlockIpRequest(BaseModel):
+    ip: str
+    reason: Optional[str] = "Manual isolation by SOC analyst"
+    duration_seconds: Optional[int] = 300
+    threat_category: Optional[str] = "Attack"
+
+
+class UnblockIpRequest(BaseModel):
+    ip: str
+
+
+class WebhookConfigRequest(BaseModel):
+    webhook_url: str
+    enabled: Optional[bool] = True
+    alert_on_severity: Optional[str] = "CRITICAL"
 
 
 class LogIngestRequest(BaseModel):
@@ -517,3 +540,171 @@ def update_system_settings(payload: SettingsUpdateRequest):
             app_state.sniffer.stop()
 
     return {"status": "UPDATED", "settings": get_system_settings()}
+
+
+# ==========================================
+# 1. Active Defense & IPS Firewall Endpoints
+# ==========================================
+
+@router.get("/defense/blocked-ips")
+def get_blocked_ips():
+    """Retrieve all attacker IPs currently isolated by Windows Firewall."""
+    return {
+        "auto_block_enabled": active_defense_manager.auto_block_enabled,
+        "default_duration": active_defense_manager.default_block_duration,
+        "blocked_ips": active_defense_manager.list_blocked_ips()
+    }
+
+
+@router.post("/defense/block")
+def block_attacker_ip(payload: BlockIpRequest):
+    """Manually isolate an attacker IP address at the host firewall level."""
+    res = active_defense_manager.block_ip(
+        ip=payload.ip,
+        reason=payload.reason or "Manual block by SOC operator",
+        duration_seconds=payload.duration_seconds,
+        threat_category=payload.threat_category or "Threat"
+    )
+    return res
+
+
+@router.post("/defense/unblock")
+def unblock_attacker_ip(payload: UnblockIpRequest):
+    """Remove firewall isolation rule for an IP address."""
+    return active_defense_manager.unblock_ip(payload.ip)
+
+
+@router.post("/defense/toggle-auto-block")
+def toggle_auto_block(enabled: bool = Query(...)):
+    """Toggle automated firewall isolation for high-confidence threats."""
+    active_defense_manager.auto_block_enabled = enabled
+    return {
+        "status": "UPDATED",
+        "auto_block_enabled": active_defense_manager.auto_block_enabled
+    }
+
+
+# ==========================================
+# 2. Threat Intelligence & GeoIP Resolver
+# ==========================================
+
+@router.get("/intel/ip/{ip}")
+def get_threat_intelligence(ip: str):
+    """Enrich IP address with country, city, ISP/ASN, and reputation score."""
+    return get_ip_intel(ip)
+
+
+# ==========================================
+# 3. AI Explainability (XAI)
+# ==========================================
+
+@router.get("/ml/explain/{alert_id}")
+def explain_alert(alert_id: int, db: Session = Depends(get_db)):
+    """Explain why the Random Forest model flagged a specific alert as an attack."""
+    alert = db.query(ThreatAlert).filter(ThreatAlert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    # Match corresponding flow record if available
+    event = (
+        db.query(NetworkEvent)
+        .filter(
+            NetworkEvent.src_ip == alert.src_ip,
+            NetworkEvent.dst_ip == alert.dst_ip
+        )
+        .order_by(desc(NetworkEvent.id))
+        .first()
+    )
+
+    flow_dict = {}
+    if event:
+        flow_dict = {
+            "flow_duration": event.flow_duration,
+            "flow_pkts_per_sec": event.packets_per_sec,
+            "flow_bytes_per_sec": event.bytes_per_sec,
+            "total_fwd_packets": event.total_packets,
+            "prediction": event.prediction,
+            "confidence": event.confidence
+        }
+    else:
+        flow_dict = {
+            "flow_duration": 1200.0 if alert.threat_category == "PortScan" else 4500000.0,
+            "flow_pkts_per_sec": 850.0 if alert.threat_category == "DoS" else 30.0,
+            "syn_flag_cnt": 15.0 if alert.threat_category == "PortScan" else 1.0,
+            "prediction": alert.threat_category,
+            "confidence": alert.confidence
+        }
+
+    ai_res = {
+        "prediction": alert.threat_category,
+        "confidence": alert.confidence,
+        "probabilities": alert.details_json if isinstance(alert.details_json, dict) else {}
+    }
+
+    explanation = explain_flow_prediction(flow_dict, ai_res)
+    explanation["alert_id"] = alert.id
+    explanation["alert_title"] = alert.title
+    explanation["src_ip"] = alert.src_ip
+    explanation["dst_ip"] = alert.dst_ip
+    explanation["dst_port"] = alert.dst_port
+    return explanation
+
+
+# ==========================================
+# 4. Executive Incident Report Exporter
+# ==========================================
+
+@router.get("/reports/incident-summary", response_class=HTMLResponse)
+def export_incident_report(db: Session = Depends(get_db)):
+    """Generate printable HTML & PDF forensic audit report."""
+    metrics_file = Path(settings.METRICS_PATH)
+    metrics_data = {}
+    if metrics_file.exists():
+        try:
+            with open(metrics_file, "r", encoding="utf-8") as f:
+                metrics_data = json.load(f)
+        except Exception:
+            metrics_data = {}
+
+    html_content = generate_executive_html_report(db, metrics_data)
+    return HTMLResponse(content=html_content)
+
+
+# ==========================================
+# 5. Real-Time Webhook Notifications
+# ==========================================
+
+@router.post("/notifications/config")
+def configure_notifications(payload: WebhookConfigRequest):
+    """Configure external webhook for Discord / Telegram / Slack alerts."""
+    notification_dispatcher.configure(
+        webhook_url=payload.webhook_url,
+        enabled=payload.enabled if payload.enabled is not None else True,
+        alert_on_severity=payload.alert_on_severity or "CRITICAL"
+    )
+    return {
+        "status": "CONFIGURED",
+        "enabled": notification_dispatcher.enabled,
+        "alert_on_severity": notification_dispatcher.alert_on_severity
+    }
+
+
+@router.post("/notifications/test")
+def test_notification():
+    """Send test alert to configured webhook or return live preview."""
+    sample_alert = {
+        "title": "Test SOC Intrusion Alert: PortScan Simulation",
+        "severity": "HIGH",
+        "src_ip": "198.51.100.23",
+        "threat_category": "PortScan",
+        "description": "Simulated multi-port horizontal sweep probe detected across 20 ports.",
+        "detection_type": "RULE_BASED"
+    }
+    if notification_dispatcher.enabled and notification_dispatcher.webhook_url:
+        return notification_dispatcher.send_alert(sample_alert)
+    return {
+        "status": "SIMULATED",
+        "message": "Webhook test simulated successfully (set webhook_url in Settings to deliver to live Discord/Telegram).",
+        "payload": sample_alert
+    }
+

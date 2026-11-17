@@ -97,6 +97,9 @@ export default function App() {
           {activeTab === 'overview' && (
             <SecurityOverview 
               pulseHistory={pulseHistory} 
+              liveEvents={liveEvents}
+              liveAlerts={liveAlerts}
+              currentPps={currentPps}
               onNavigateToThreats={() => setActiveTab('threats')} 
             />
           )}
