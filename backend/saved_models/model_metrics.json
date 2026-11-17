@@ -1,0 +1,352 @@
+{
+  "model_type": "Random Forest Classifier",
+  "dataset": "CIC-IDS2017 Augmented Flow Standard",
+  "dataset_source": "Parametric distribution based on UNB CIC-IDS2017 schema",
+  "is_authentic_unb": false,
+  "total_samples": 6010,
+  "train_samples": 4808,
+  "test_samples": 1202,
+  "accuracy": 1.0,
+  "macro_precision": 1.0,
+  "macro_recall": 1.0,
+  "macro_f1": 1.0,
+  "weighted_f1": 1.0,
+  "false_positive_rate": 0.0,
+  "per_class_fpr": {
+    "BENIGN": 0.0,
+    "Botnet": 0.0,
+    "BruteForce": 0.0,
+    "DoS": 0.0,
+    "PortScan": 0.0
+  },
+  "classes": [
+    "BENIGN",
+    "Botnet",
+    "BruteForce",
+    "DoS",
+    "PortScan"
+  ],
+  "class_distribution": {
+    "BENIGN": 2702,
+    "PortScan": 1203,
+    "DoS": 902,
+    "BruteForce": 603,
+    "Botnet": 600
+  },
+  "confusion_matrix": [
+    [
+      540,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      120,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      121,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      180,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      241
+    ]
+  ],
+  "classification_report": {
+    "BENIGN": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 540.0
+    },
+    "Botnet": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "BruteForce": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 121.0
+    },
+    "DoS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 180.0
+    },
+    "PortScan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 241.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 1202.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 1202.0
+    }
+  },
+  "feature_importances": [
+    {
+      "feature": "fwd_pkt_len_min",
+      "importance": 0.07446146935896655
+    },
+    {
+      "feature": "pkt_len_min",
+      "importance": 0.07011586424758737
+    },
+    {
+      "feature": "flow_iat_min",
+      "importance": 0.06813880087349075
+    },
+    {
+      "feature": "pkt_len_mean",
+      "importance": 0.06609009574528611
+    },
+    {
+      "feature": "bwd_pkt_len_min",
+      "importance": 0.06419726111604901
+    },
+    {
+      "feature": "pkt_len_max",
+      "importance": 0.05709507736429083
+    },
+    {
+      "feature": "avg_pkt_size",
+      "importance": 0.05302110908388005
+    },
+    {
+      "feature": "bwd_pkt_len_mean",
+      "importance": 0.05268178147540821
+    },
+    {
+      "feature": "psh_flag_cnt",
+      "importance": 0.05039081062594325
+    },
+    {
+      "feature": "fwd_pkt_len_max",
+      "importance": 0.04638416703690159
+    },
+    {
+      "feature": "fwd_pkt_len_mean",
+      "importance": 0.03749600666931337
+    },
+    {
+      "feature": "pkt_len_std",
+      "importance": 0.03531123133229654
+    },
+    {
+      "feature": "bwd_pkt_len_max",
+      "importance": 0.030873302419272126
+    },
+    {
+      "feature": "fwd_pkt_len_std",
+      "importance": 0.030166375828855528
+    },
+    {
+      "feature": "fwd_header_len",
+      "importance": 0.02791649697008039
+    }
+  ],
+  "all_feature_importances": [
+    {
+      "feature": "fwd_pkt_len_min",
+      "importance": 0.07446146935896655
+    },
+    {
+      "feature": "pkt_len_min",
+      "importance": 0.07011586424758737
+    },
+    {
+      "feature": "flow_iat_min",
+      "importance": 0.06813880087349075
+    },
+    {
+      "feature": "pkt_len_mean",
+      "importance": 0.06609009574528611
+    },
+    {
+      "feature": "bwd_pkt_len_min",
+      "importance": 0.06419726111604901
+    },
+    {
+      "feature": "pkt_len_max",
+      "importance": 0.05709507736429083
+    },
+    {
+      "feature": "avg_pkt_size",
+      "importance": 0.05302110908388005
+    },
+    {
+      "feature": "bwd_pkt_len_mean",
+      "importance": 0.05268178147540821
+    },
+    {
+      "feature": "psh_flag_cnt",
+      "importance": 0.05039081062594325
+    },
+    {
+      "feature": "fwd_pkt_len_max",
+      "importance": 0.04638416703690159
+    },
+    {
+      "feature": "fwd_pkt_len_mean",
+      "importance": 0.03749600666931337
+    },
+    {
+      "feature": "pkt_len_std",
+      "importance": 0.03531123133229654
+    },
+    {
+      "feature": "bwd_pkt_len_max",
+      "importance": 0.030873302419272126
+    },
+    {
+      "feature": "fwd_pkt_len_std",
+      "importance": 0.030166375828855528
+    },
+    {
+      "feature": "fwd_header_len",
+      "importance": 0.02791649697008039
+    },
+    {
+      "feature": "ack_flag_cnt",
+      "importance": 0.027283243844645484
+    },
+    {
+      "feature": "total_fwd_len",
+      "importance": 0.026685882076514
+    },
+    {
+      "feature": "flow_iat_std",
+      "importance": 0.024754631526200353
+    },
+    {
+      "feature": "init_win_bytes_fwd",
+      "importance": 0.022347152903822436
+    },
+    {
+      "feature": "init_win_bytes_bwd",
+      "importance": 0.021844227221270676
+    },
+    {
+      "feature": "flow_bytes_per_sec",
+      "importance": 0.019292736430064086
+    },
+    {
+      "feature": "total_bwd_packets",
+      "importance": 0.010227816468642362
+    },
+    {
+      "feature": "fwd_iat_total",
+      "importance": 0.010040292146284628
+    },
+    {
+      "feature": "fwd_iat_mean",
+      "importance": 0.009775179057336958
+    },
+    {
+      "feature": "total_fwd_packets",
+      "importance": 0.009767567849571899
+    },
+    {
+      "feature": "flow_duration",
+      "importance": 0.008976062888016965
+    },
+    {
+      "feature": "bwd_iat_total",
+      "importance": 0.008930820350789985
+    },
+    {
+      "feature": "bwd_header_len",
+      "importance": 0.007608125526605363
+    },
+    {
+      "feature": "fwd_pkts_per_sec",
+      "importance": 0.007549683926942612
+    },
+    {
+      "feature": "flow_iat_max",
+      "importance": 0.0051558113634196144
+    },
+    {
+      "feature": "bwd_iat_mean",
+      "importance": 0.005003468583169939
+    },
+    {
+      "feature": "flow_pkts_per_sec",
+      "importance": 0.004887689862068762
+    },
+    {
+      "feature": "total_bwd_len",
+      "importance": 0.003230039175592418
+    },
+    {
+      "feature": "syn_flag_cnt",
+      "importance": 0.001399450811019923
+    },
+    {
+      "feature": "bwd_pkt_len_std",
+      "importance": 0.0005185290808486211
+    },
+    {
+      "feature": "bwd_pkts_per_sec",
+      "importance": 0.00019886616942573515
+    },
+    {
+      "feature": "down_up_ratio",
+      "importance": 0.00013253065624522586
+    },
+    {
+      "feature": "flow_iat_mean",
+      "importance": 3.78423200885868e-05
+    },
+    {
+      "feature": "destination_port",
+      "importance": 1.1782533962423371e-05
+    },
+    {
+      "feature": "rst_flag_cnt",
+      "importance": 7.17079829192839e-07
+    },
+    {
+      "feature": "fin_flag_cnt",
+      "importance": 0.0
+    },
+    {
+      "feature": "urg_flag_cnt",
+      "importance": 0.0
+    }
+  ],
+  "training_date": "2026-11-16T00:50:38.281583",
+  "timestamp": "2026-11-16T00:50:38.281583"
+}
