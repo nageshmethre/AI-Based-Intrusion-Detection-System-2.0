@@ -1,37 +1,64 @@
 import React, { useMemo } from 'react';
-import { Globe, Shield, Radio, Activity } from 'lucide-react';
+import { WORLD_MAP_PATH } from './worldMapPath';
+import { Activity } from 'lucide-react';
 
 export default function GlobalThreatMap({ threatNodes = [] }) {
-  // Destination target: "Your System" (User Host)
-  const targetCoord = { x: 710, y: 260, label: 'Your System (Host)' };
+  // Destination Target: "Your System (Host)" - Indian Subcontinent (New Delhi / Bangalore region)
+  // Formula: lon 77.2 -> x 714, lat 28.6 -> y 171
+  const targetCoord = { x: 714, y: 171, label: 'Your System (Host)' };
 
-  // Generate realistic attack nodes based on actual threat data or default active threat sectors
+  // Pre-calibrated global threat sectors matching enterprise cybersecurity command centers
+  const defaultGlobalSectors = [
+    { id: 1, x: 286, y: 142, ip: '198.51.100.24', city: 'Ashburn, US', sev: 'HIGH', cat: 'DoS' },
+    { id: 2, x: 524, y: 111, ip: '185.199.108.153', city: 'Frankfurt, DE', sev: 'MEDIUM', cat: 'BruteForce' },
+    { id: 3, x: 888, y: 151, ip: '203.0.113.88', city: 'Tokyo, JP', sev: 'HIGH', cat: 'PortScan' },
+    { id: 4, x: 370, y: 315, ip: '177.136.242.12', city: 'Sao Paulo, BR', sev: 'CRITICAL', cat: 'Botnet' },
+    { id: 5, x: 604, y: 95, ip: '91.240.118.50', city: 'Moscow, RU', sev: 'HIGH', cat: 'DoS' }
+  ];
+
+  // Map real threat telemetry to geographical nodes, ensuring no node overlaps with the host
   const sources = useMemo(() => {
-    const defaultSectors = [
-      { id: 1, x: 230, y: 170, ip: '198.51.100.24', city: 'Ashburn, US', sev: 'HIGH', cat: 'DoS' },
-      { id: 2, x: 505, y: 155, ip: '185.199.108.153', city: 'Frankfurt, DE', sev: 'MEDIUM', cat: 'BruteForce' },
-      { id: 3, x: 820, y: 200, ip: '203.0.113.88', city: 'Tokyo, JP', sev: 'HIGH', cat: 'PortScan' },
-      { id: 4, x: 330, y: 360, ip: '177.136.242.12', city: 'Sao Paulo, BR', sev: 'CRITICAL', cat: 'Botnet' },
-      { id: 5, x: 670, y: 140, ip: '91.240.118.50', city: 'Moscow, RU', sev: 'HIGH', cat: 'DoS' }
-    ];
-
     if (!threatNodes || threatNodes.length === 0) {
-      return defaultSectors;
+      return defaultGlobalSectors;
     }
 
+    // Assign threat nodes to distinct global vantage points
     return threatNodes.slice(0, 5).map((node, idx) => {
-      // Map lat/lon to SVG 1000x500 canvas coordinates
-      let sx = 500 + (node.lon || 0) * (500 / 180);
-      let sy = 250 - (node.lat || 0) * (250 / 90);
-      sx = Math.max(80, Math.min(920, sx));
-      sy = Math.max(60, Math.min(440, sy));
+      let x, y;
+      const isLocalOrPrivate = 
+        !node.lat || !node.lon || 
+        node.ip === '127.0.0.1' || 
+        node.ip?.startsWith('192.168.') || 
+        node.ip?.startsWith('10.') || 
+        node.ip?.startsWith('172.') ||
+        node.ip?.startsWith('2409:');
+
+      if (isLocalOrPrivate) {
+        // Map local test vectors to a default global threat ingress sector
+        const fallbackSector = defaultGlobalSectors[idx % defaultGlobalSectors.length];
+        x = fallbackSector.x;
+        y = fallbackSector.y;
+      } else {
+        // Standard Equirectangular projection
+        x = Math.round(((node.lon + 180.0) / 360.0) * 1000.0);
+        y = Math.round(((90.0 - node.lat) / 180.0) * 500.0);
+        
+        // Prevent stacking right on host (within 40px radius)
+        if (Math.abs(x - targetCoord.x) < 45 && Math.abs(y - targetCoord.y) < 45) {
+          x = defaultGlobalSectors[idx % defaultGlobalSectors.length].x;
+          y = defaultGlobalSectors[idx % defaultGlobalSectors.length].y;
+        }
+      }
+
+      x = Math.max(60, Math.min(940, x));
+      y = Math.max(50, Math.min(450, y));
 
       return {
         id: idx,
-        x: Math.round(sx),
-        y: Math.round(sy),
+        x,
+        y,
         ip: node.ip || '198.51.100.23',
-        city: `${node.city || 'Remote'}, ${node.country || 'Host'}`,
+        city: `${node.city || 'Remote Node'}, ${node.country || 'External'}`,
         sev: node.severity || 'HIGH',
         cat: node.category || 'Threat'
       };
@@ -39,153 +66,210 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
   }, [threatNodes]);
 
   return (
-    <div className="relative w-full h-[320px] bg-[#070D19] border border-cyan-900/30 rounded-xl overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.7)] flex flex-col justify-between p-4">
+    <div className="relative w-full h-[330px] bg-[#040814] border border-cyan-900/35 rounded-xl overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.85)] flex flex-col justify-between p-3.5 select-none">
       {/* Top Header & Legend */}
-      <div className="flex items-center justify-between z-10 select-none">
+      <div className="flex items-center justify-between z-10">
         <div className="flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
           <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center">
             GLOBAL THREAT MAP (LIVE)
           </h4>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center space-x-4 text-[11px] font-mono text-slate-300 bg-slate-950/70 px-3 py-1 rounded-lg border border-slate-800">
+        <div className="flex items-center space-x-4 text-[11px] font-mono text-slate-300 bg-[#060D1E]/90 px-3 py-1 rounded-lg border border-cyan-950 shadow-sm backdrop-blur">
           <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-cyan-200"></span>
-            <span>Your System</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-cyan-200 shadow-[0_0_8px_#38bdf8]"></span>
+            <span className="text-white font-semibold">Your System</span>
           </div>
           <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border border-red-300"></span>
-            <span>Attack Source</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border border-red-300 shadow-[0_0_8px_#ef4444]"></span>
+            <span className="text-white font-semibold">Attack Source</span>
           </div>
           <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-0.5 bg-red-500"></span>
-            <span>Attack Flow</span>
+            <span className="w-3.5 h-0.5 bg-red-500 rounded"></span>
+            <span className="text-slate-300">Attack Flow</span>
           </div>
         </div>
       </div>
 
-      {/* SVG Canvas for High-Tech World Map & Animated Attack Arcs */}
+      {/* High-Resolution SVG Canvas */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <svg viewBox="0 0 1000 500" className="w-full h-full opacity-90">
+        <svg viewBox="0 0 1000 500" className="w-full h-full">
           <defs>
-            {/* Glow Filter */}
-            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
+            {/* High-Tech Glowing Filter */}
+            <filter id="mapGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
 
-            {/* Red Arc Gradient */}
-            <linearGradient id="attackGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
+            {/* Matrix Dot Pattern Fill for Continents */}
+            <pattern id="continentDotMatrix" width="7" height="7" patternUnits="userSpaceOnUse">
+              <circle cx="3.5" cy="3.5" r="1.1" fill="#38bdf8" opacity="0.38" />
+            </pattern>
+
+            {/* Attack Beam Gradient */}
+            <linearGradient id="attackBeamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" />
+              <stop offset="70%" stopColor="#f87171" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.95" />
             </linearGradient>
           </defs>
 
-          {/* Grid Background Lines */}
-          <g stroke="#0f2238" strokeWidth="0.5" strokeDasharray="3 3">
+          {/* Precision Coordinate Latitude & Longitude Grid Lines */}
+          <g stroke="#09182d" strokeWidth="0.6" strokeDasharray="3 4">
+            {/* Longitude Meridians */}
             {[100, 200, 300, 400, 500, 600, 700, 800, 900].map((x) => (
               <line key={x} x1={x} y1="0" x2={x} y2="500" />
             ))}
-            {[100, 200, 300, 400].map((y) => (
+            {/* Latitude Parallels */}
+            {[70, 140, 210, 280, 350, 420].map((y) => (
               <line key={y} x1="0" y1={y} x2="1000" y2={y} />
             ))}
+            {/* Equator */}
+            <line x1="0" y1="250" x2="1000" y2="250" stroke="#0e2a4f" strokeWidth="1" strokeDasharray="4 2" />
           </g>
 
-          {/* Continent Landmass Silhouettes (World Map Vector Dots) */}
-          <g fill="#142c47" opacity="0.65">
-            {/* North America */}
-            <path d="M 150 80 Q 220 90 280 120 T 320 200 Q 250 250 210 240 T 170 170 Z" />
-            <path d="M 180 130 Q 270 140 290 190 T 210 220 Z" fill="#1b395b" />
-            {/* South America */}
-            <path d="M 280 260 Q 350 280 370 340 T 320 440 Q 270 410 280 320 Z" />
-            {/* Europe */}
-            <path d="M 460 110 Q 540 100 580 150 T 520 200 Q 470 190 460 140 Z" fill="#1b395b" />
-            {/* Africa */}
-            <path d="M 480 200 Q 560 210 580 280 T 550 400 Q 490 380 470 270 Z" />
-            {/* Asia */}
-            <path d="M 600 100 Q 750 90 850 140 T 890 240 Q 780 310 680 250 T 600 160 Z" fill="#1b395b" />
-            {/* India Subcontinent */}
-            <path d="M 680 220 Q 720 230 740 270 T 700 310 Q 670 270 680 220 Z" fill="#20456e" />
-            {/* Australia */}
-            <path d="M 800 340 Q 880 330 900 390 T 830 430 Q 780 400 800 340 Z" />
+          {/* Authentic Real-World Continent Landmasses */}
+          <g>
+            {/* 1. Base Landmass Silhouette Fill */}
+            <path
+              d={WORLD_MAP_PATH}
+              fill="#08152b"
+              stroke="#0e335f"
+              strokeWidth="0.75"
+              strokeLinejoin="round"
+            />
+            {/* 2. Cyber Matrix Dot Overlay Fill */}
+            <path
+              d={WORLD_MAP_PATH}
+              fill="url(#continentDotMatrix)"
+              stroke="#0284c7"
+              strokeWidth="0.65"
+              strokeOpacity="0.5"
+              strokeLinejoin="round"
+            />
           </g>
 
-          {/* Animated Curved Attack Arcs */}
+          {/* Dynamic Animated Attack Arcs & Shockwaves */}
           {sources.map((src) => {
-            // Cubic bezier with an elevated arch control point
+            // Elevated parabolic curve
             const midX = (src.x + targetCoord.x) / 2;
-            const midY = Math.min(src.y, targetCoord.y) - 60;
-            const pathD = `M ${src.x} ${src.y} Q ${midX} ${midY} ${targetCoord.x} ${targetCoord.y}`;
+            const dist = Math.abs(src.x - targetCoord.x);
+            const elevation = Math.min(100, Math.max(45, dist * 0.22));
+            const midY = Math.min(src.y, targetCoord.y) - elevation;
+            const arcPath = `M ${src.x} ${src.y} Q ${midX} ${midY} ${targetCoord.x} ${targetCoord.y}`;
 
             return (
               <g key={src.id}>
-                {/* Background glow arc */}
+                {/* Background Shadow Arc */}
                 <path
-                  d={pathD}
+                  d={arcPath}
                   fill="none"
                   stroke="#ef4444"
-                  strokeWidth="2"
-                  strokeOpacity="0.4"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.3"
                   strokeDasharray="4 4"
                 />
 
-                {/* Animated beam */}
+                {/* Animated Flowing Laser Pulse */}
                 <path
-                  d={pathD}
+                  d={arcPath}
                   fill="none"
-                  stroke="url(#attackGrad)"
+                  stroke="url(#attackBeamGrad)"
                   strokeWidth="2.5"
                   strokeLinecap="round"
-                  strokeDasharray="8 120"
-                  filter="url(#glow)"
+                  strokeDasharray="10 140"
+                  filter="url(#mapGlow)"
                 >
                   <animate
                     attributeName="stroke-dashoffset"
-                    from="128"
+                    from="150"
                     to="0"
-                    dur="2.5s"
+                    dur="2.2s"
                     repeatCount="indefinite"
                   />
                 </path>
 
-                {/* Attack Source Point */}
-                <circle cx={src.x} cy={src.y} r="4" fill="#ef4444" filter="url(#glow)" />
-                <circle cx={src.x} cy={src.y} r="8" fill="none" stroke="#ef4444" strokeWidth="1" opacity="0.7">
-                  <animate attributeName="r" values="4;14;4" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite" />
+                {/* Attacker Pulsing Beacon */}
+                <circle cx={src.x} cy={src.y} r="4" fill="#ef4444" filter="url(#mapGlow)" />
+                <circle cx={src.x} cy={src.y} r="8" fill="none" stroke="#ef4444" strokeWidth="1.2">
+                  <animate attributeName="r" values="4;15;4" dur="2.2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.9;0;0.9" dur="2.2s" repeatCount="indefinite" />
                 </circle>
 
-                {/* Attacker Tooltip Pill in SVG */}
-                <text x={src.x} y={src.y - 12} fill="#fca5a5" fontSize="9" fontFamily="monospace" textAnchor="middle" fontWeight="bold">
-                  {src.ip}
-                </text>
+                {/* Floating IP Badge */}
+                <g transform={`translate(${src.x}, ${src.y - 12})`}>
+                  <rect
+                    x="-42"
+                    y="-9"
+                    width="84"
+                    height="13"
+                    rx="3"
+                    fill="#050a16"
+                    stroke="#ef4444"
+                    strokeWidth="0.6"
+                    opacity="0.88"
+                  />
+                  <text
+                    x="0"
+                    y="1"
+                    fill="#fca5a5"
+                    fontSize="8"
+                    fontFamily="monospace"
+                    textAnchor="middle"
+                    fontWeight="bold"
+                  >
+                    {src.ip}
+                  </text>
+                </g>
               </g>
             );
           })}
 
-          {/* Destination Node: "Your System" (Target) */}
+          {/* Central Target Node: "Your System (Host)" */}
           <g>
-            <circle cx={targetCoord.x} cy={targetCoord.y} r="7" fill="#38bdf8" filter="url(#glow)" />
-            <circle cx={targetCoord.x} cy={targetCoord.y} r="16" fill="none" stroke="#38bdf8" strokeWidth="1.5">
-              <animate attributeName="r" values="7;24;7" dur="2.5s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="1;0;1" dur="2.5s" repeatCount="indefinite" />
+            <circle cx={targetCoord.x} cy={targetCoord.y} r="6.5" fill="#38bdf8" filter="url(#mapGlow)" />
+            <circle cx={targetCoord.x} cy={targetCoord.y} r="15" fill="none" stroke="#38bdf8" strokeWidth="1.4">
+              <animate attributeName="r" values="6.5;24;6.5" dur="2.4s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="1;0;1" dur="2.4s" repeatCount="indefinite" />
             </circle>
-            <circle cx={targetCoord.x} cy={targetCoord.y} r="28" fill="none" stroke="#0284c7" strokeWidth="1" strokeDasharray="2 2" />
+            <circle cx={targetCoord.x} cy={targetCoord.y} r="30" fill="none" stroke="#0284c7" strokeWidth="0.8" strokeDasharray="3 3" />
             
-            <text x={targetCoord.x} y={targetCoord.y + 24} fill="#38bdf8" fontSize="10" fontFamily="monospace" textAnchor="middle" fontWeight="bold">
-              {targetCoord.label}
-            </text>
+            {/* Host Tooltip Label */}
+            <g transform={`translate(${targetCoord.x}, ${targetCoord.y + 20})`}>
+              <rect
+                x="-46"
+                y="-8"
+                width="92"
+                height="14"
+                rx="3"
+                fill="#030814"
+                stroke="#38bdf8"
+                strokeWidth="0.8"
+                opacity="0.92"
+              />
+              <text
+                x="0"
+                y="2.5"
+                fill="#38bdf8"
+                fontSize="8.5"
+                fontFamily="monospace"
+                textAnchor="middle"
+                fontWeight="bold"
+              >
+                {targetCoord.label}
+              </text>
+            </g>
           </g>
         </svg>
       </div>
 
-      {/* Bottom Live Threat Summary Indicator */}
-      <div className="z-10 flex items-center justify-between text-[11px] font-mono text-slate-400 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800/80 backdrop-blur">
+      {/* Bottom Live Threat Summary Footer */}
+      <div className="z-10 flex items-center justify-between text-[11px] font-mono text-slate-300 bg-[#060D1E]/90 px-3 py-1.5 rounded-lg border border-cyan-950 backdrop-blur shadow-sm">
         <div className="flex items-center space-x-2">
           <Activity className="w-3.5 h-3.5 text-cyan-400" />
           <span>Active Threat Arcs: <strong className="text-white">{sources.length} Detected Vectors</strong></span>
