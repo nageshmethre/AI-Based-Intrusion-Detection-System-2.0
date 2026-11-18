@@ -16,7 +16,12 @@ import {
   Globe, 
   Radio, 
   Flame,
-  Maximize2
+  Maximize2,
+  Play,
+  Square,
+  Network,
+  Cpu,
+  Database
 } from 'lucide-react';
 import { 
   AreaChart, Area, PieChart, Pie, Cell, 
@@ -33,14 +38,22 @@ import LiveTerminal from '../components/LiveTerminal';
 import HackerAttackMatrix from '../components/HackerAttackMatrix';
 import ActiveDefensePanel from '../components/ActiveDefensePanel';
 import AiExplainerModal from '../components/AiExplainerModal';
-import MaximizedPanelModal from '../components/MaximizedPanelModal';
 
 export default function SecurityOverview({ 
   pulseHistory = [], 
   liveEvents = [], 
   liveAlerts = [], 
   currentPps = 0, 
-  currentInterface = 'Intel(R) Wi-Fi 6 AX201', 
+  currentInterface = 'Intel(R) Wi-Fi 6 AX201',
+  interfaces = [],
+  selectedInterface = '',
+  onSelectInterface,
+  snifferRunning = true,
+  onToggleSniffer,
+  totalPackets = 0,
+  bandwidthMbps = 0.0,
+  topSourceIps = [],
+  topDestPorts = [],
   onNavigateToThreats,
   onOpenMaximized
 }) {
@@ -52,13 +65,10 @@ export default function SecurityOverview({
   const [predictionFilter, setPredictionFilter] = useState('ALL');
   const [explainingAlert, setExplainingAlert] = useState(null);
   const [alertsList, setAlertsList] = useState([]);
-  const [localMaximized, setLocalMaximized] = useState(null);
 
   const handleMaximize = (panel) => {
     if (onOpenMaximized) {
       onOpenMaximized(panel);
-    } else {
-      setLocalMaximized(panel);
     }
   };
 
@@ -125,7 +135,7 @@ export default function SecurityOverview({
       return data.traffic_flow_stats;
     }
     return {
-      total_flows: data?.total_packets_or_flows || 30738,
+      total_flows: data?.total_packets_or_flows || totalPackets || 30738,
       normal: data?.normal_traffic || 29188,
       suspicious: data?.suspicious_traffic || 1550,
       dos: data?.attack_distribution?.DoS || 498,
@@ -134,7 +144,7 @@ export default function SecurityOverview({
       botnet: data?.attack_distribution?.Botnet || 12,
       active_alerts: data?.open_alerts || 517
     };
-  }, [data]);
+  }, [data, totalPackets]);
 
   const donutData = useMemo(() => {
     const list = [
@@ -150,81 +160,170 @@ export default function SecurityOverview({
     return list;
   }, [flowStats]);
 
-  // Combined stream of events
+  // Combine live flow events with backend events for stream table
   const combinedEvents = useMemo(() => {
-    const list = [...liveEvents, ...(data?.recent_events || [])];
-    return list.filter((ev) => {
-      if (protocolFilter !== 'ALL' && ev.protocol !== protocolFilter) return false;
-      if (predictionFilter === 'MALICIOUS' && ev.prediction === 'BENIGN') return false;
-      if (predictionFilter === 'BENIGN' && ev.prediction !== 'BENIGN') return false;
-      if (searchTerm) {
-        const q = searchTerm.toLowerCase();
-        return (
-          ev.src_ip?.toLowerCase().includes(q) ||
-          ev.dst_ip?.toLowerCase().includes(q) ||
-          ev.prediction?.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    }).slice(0, 6);
-  }, [liveEvents, data?.recent_events, protocolFilter, predictionFilter, searchTerm]);
-
-  // Filtered Alerts
-  const filteredAlerts = useMemo(() => {
-    return alertsList.filter((a) => {
-      if (!searchTerm) return true;
-      const q = searchTerm.toLowerCase();
-      return (
-        a.src_ip?.toLowerCase().includes(q) ||
-        a.dst_ip?.toLowerCase().includes(q) ||
-        a.title?.toLowerCase().includes(q) ||
-        a.threat_category?.toLowerCase().includes(q) ||
-        String(a.id).includes(q)
+    let list = liveEvents.length > 0 ? liveEvents : (data?.recent_events || []);
+    if (protocolFilter !== 'ALL') {
+      list = list.filter((e) => (e.protocol || '').toUpperCase() === protocolFilter);
+    }
+    if (predictionFilter === 'MALICIOUS') {
+      list = list.filter((e) => e.prediction !== 'BENIGN');
+    } else if (predictionFilter === 'BENIGN') {
+      list = list.filter((e) => e.prediction === 'BENIGN');
+    }
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter((e) => 
+        (e.src_ip && e.src_ip.toLowerCase().includes(term)) ||
+        (e.dst_ip && e.dst_ip.toLowerCase().includes(term)) ||
+        (e.prediction && e.prediction.toLowerCase().includes(term))
       );
-    }).slice(0, 5);
+    }
+    return list.slice(0, 12);
+  }, [liveEvents, data, protocolFilter, predictionFilter, searchTerm]);
+
+  // Filtered recent alerts for the alerts table
+  const filteredAlerts = useMemo(() => {
+    let list = alertsList;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter((a) => 
+        (a.source_ip && a.source_ip.toLowerCase().includes(term)) ||
+        (a.attack_category && a.attack_category.toLowerCase().includes(term)) ||
+        (a.detection_method && a.detection_method.toLowerCase().includes(term))
+      );
+    }
+    return list.slice(0, 6);
   }, [alertsList, searchTerm]);
 
+  const displayIps = topSourceIps.length > 0 ? topSourceIps : (data?.top_source_ips || []);
+  const displayPorts = topDestPorts.length > 0 ? topDestPorts : (data?.top_dest_ports || []);
+
+  // 8 Metric Cards Configuration - strictly identical height & inner structure
+  const kpiCards = [
+    {
+      label: 'TOTAL FLOWS',
+      value: flowStats.total_flows?.toLocaleString() || '0',
+      delta: '+12%',
+      bgClass: 'bg-[#091326]/70',
+      borderClass: 'border-cyan-900/40',
+      labelClass: 'text-slate-400',
+      valClass: 'text-white',
+      deltaClass: 'text-emerald-400'
+    },
+    {
+      label: 'NORMAL',
+      value: flowStats.normal?.toLocaleString() || '0',
+      delta: '+10%',
+      bgClass: 'bg-[#091326]/70',
+      borderClass: 'border-cyan-900/40',
+      labelClass: 'text-slate-400',
+      valClass: 'text-cyan-400',
+      deltaClass: 'text-emerald-400'
+    },
+    {
+      label: 'SUSPICIOUS',
+      value: flowStats.suspicious?.toLocaleString() || '0',
+      delta: '-5%',
+      bgClass: 'bg-[#091326]/70',
+      borderClass: 'border-cyan-900/40',
+      labelClass: 'text-slate-400',
+      valClass: 'text-amber-400',
+      deltaClass: 'text-rose-400'
+    },
+    {
+      label: 'DoS',
+      value: (flowStats.dos || 0).toLocaleString(),
+      delta: '+3%',
+      bgClass: 'bg-[#091326]/70',
+      borderClass: 'border-cyan-900/40',
+      labelClass: 'text-slate-400',
+      valClass: 'text-rose-400',
+      deltaClass: 'text-rose-400'
+    },
+    {
+      label: 'PortScan',
+      value: (flowStats.portscan || 0).toLocaleString(),
+      delta: '+8%',
+      bgClass: 'bg-[#091326]/70',
+      borderClass: 'border-cyan-900/40',
+      labelClass: 'text-slate-400',
+      valClass: 'text-amber-400',
+      deltaClass: 'text-rose-400'
+    },
+    {
+      label: 'BruteForce',
+      value: (flowStats.bruteforce || 0).toLocaleString(),
+      delta: '+4%',
+      bgClass: 'bg-[#091326]/70',
+      borderClass: 'border-cyan-900/40',
+      labelClass: 'text-slate-400',
+      valClass: 'text-purple-400',
+      deltaClass: 'text-rose-400'
+    },
+    {
+      label: 'Botnet',
+      value: (flowStats.botnet || 0).toLocaleString(),
+      delta: '+4%',
+      bgClass: 'bg-[#091326]/70',
+      borderClass: 'border-cyan-900/40',
+      labelClass: 'text-slate-400',
+      valClass: 'text-pink-400',
+      deltaClass: 'text-rose-400'
+    },
+    {
+      label: 'ACTIVE ALERTS',
+      value: (flowStats.active_alerts || 0).toLocaleString(),
+      delta: 'CRITICAL',
+      bgClass: 'bg-red-950/40',
+      borderClass: 'border-red-500/50 animate-pulse',
+      labelClass: 'text-red-300',
+      valClass: 'text-red-400',
+      deltaClass: 'text-red-300'
+    }
+  ];
+
   return (
-    <div className="space-y-4">
-      {/* Top Controls Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#080D1A] border border-cyan-900/30 p-2.5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
-        {/* Toggle Pills: SOC Defender vs Hacker Attack Matrix */}
-        <div className="flex items-center space-x-1.5 bg-[#050811] p-1 rounded-lg border border-slate-800">
+    <div className="space-y-3.5 max-w-[1750px] mx-auto select-none">
+      {/* Top Controls Bar: View Toggle, Search, Export PDF, Download Logs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#070D19] border border-cyan-900/30 p-2.5 rounded-xl shadow-lg">
+        {/* View Mode Toggle */}
+        <div className="flex items-center space-x-2">
           <button
             onClick={() => setViewMode('DEFENDER')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all ${
+            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
               viewMode === 'DEFENDER'
-                ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)]'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)] border border-blue-400/50'
+                : 'bg-[#0A1326] text-slate-400 hover:text-white border border-cyan-900/30'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
+            <ShieldCheck className="w-4 h-4" />
             <span>SOC Defender View</span>
           </button>
 
           <button
             onClick={() => setViewMode('HACKER_MATRIX')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all ${
+            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
               viewMode === 'HACKER_MATRIX'
-                ? 'bg-rose-600 text-white shadow-[0_0_12px_rgba(225,29,72,0.4)]'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-emerald-600 text-black shadow-[0_0_15px_rgba(16,185,129,0.5)] border border-emerald-400/50'
+                : 'bg-[#0A1326] text-slate-400 hover:text-emerald-400 border border-cyan-900/30'
             }`}
           >
-            <Radio className="w-3.5 h-3.5 animate-pulse text-rose-300" />
+            <Radio className="w-4 h-4" />
             <span>Hacker Attack Matrix</span>
           </button>
         </div>
 
-        {/* Search Bar */}
+        {/* Global IP / Port / Alert Search */}
         <div className="flex-1 max-w-md mx-2">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+            <Search className="w-4 h-4 text-cyan-400 absolute left-3 top-2.5" />
             <input
               type="text"
+              placeholder="Search IP / Port / Alert ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search IP / Port / Alert ID..."
-              className="w-full bg-[#050811] border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 transition-colors"
+              className="w-full bg-[#050811] border border-cyan-900/40 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-400 shadow-inner"
             />
           </div>
         </div>
@@ -235,7 +334,7 @@ export default function SecurityOverview({
             href={getIncidentReportUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#0A1326] hover:bg-[#101F3E] text-cyan-300 border border-cyan-800/50 rounded-lg text-xs font-mono font-bold transition-all shadow"
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#0A1326] hover:bg-[#101F3E] text-cyan-300 border border-cyan-800/50 rounded-lg text-xs font-mono font-bold transition-all shadow cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Export PDF</span>
@@ -244,7 +343,7 @@ export default function SecurityOverview({
           <a
             href={getLogsDownloadUrl()}
             download
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#0A1326] hover:bg-[#101F3E] text-slate-300 border border-slate-700/60 rounded-lg text-xs font-mono font-bold transition-all shadow"
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#0A1326] hover:bg-[#101F3E] text-slate-300 border border-slate-700/60 rounded-lg text-xs font-mono font-bold transition-all shadow cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download Logs</span>
@@ -263,216 +362,270 @@ export default function SecurityOverview({
           <ActiveDefensePanel />
         </div>
       ) : (
-        /* Symmetrical SOC Defender Dashboard: Exact Order, Balanced Heights */
-        <>
+        /* Symmetrical 3-Column SOC Defender Command Center matching Reference Image */
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-3.5 items-start">
+          
           {/* ========================================================= */}
-          {/* ROW 1: Map + KPI Strip (Left 7) vs Stats + Traffic (Right 5) */}
-          {/* Total Height for both columns is balanced at ~360px       */}
+          {/* COLUMN 1 (LEFT, 3 cols): System Status, NIC, Top IPs & Ports */}
           {/* ========================================================= */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
-            {/* Left 7 Columns: Threat Map + KPI Strip */}
-            <div className="lg:col-span-7 flex flex-col justify-between space-y-2.5">
-              {/* Threat Map with Maximize button */}
-              <div className="flex-1">
-                <GlobalThreatMap 
-                  threatNodes={data?.threat_map_nodes || []} 
-                  onMaximize={() => handleMaximize('MAP')}
-                />
+          <div className="xl:col-span-3 space-y-3">
+            {/* Box 1: SYSTEM STATUS */}
+            <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md space-y-2">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1"></span>
+                  <span>SYSTEM STATUS</span>
+                </h4>
+                <button
+                  onClick={() => handleMaximize('SYSTEM_STATUS')}
+                  className="p-1 rounded hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                  title="Expand System Status to Big Size"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
               </div>
-
-              {/* KPI Metrics Strip */}
-              <div className="h-[65px] grid grid-cols-4 sm:grid-cols-8 gap-1.5 bg-[#070D19] border border-cyan-900/30 p-2 rounded-xl shadow-md font-mono text-center items-center">
-                <div className="p-1 rounded bg-[#091326]/60 border border-cyan-900/40">
-                  <span className="text-[9px] text-slate-400 block uppercase">TOTAL FLOWS</span>
-                  <span className="text-xs font-black text-white">{flowStats.total_flows?.toLocaleString()}</span>
-                  <span className="text-[9px] text-emerald-400 block font-semibold">+12%</span>
+              <div className="text-[11px] font-mono space-y-1.5 text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Packet Capture</span>
+                  <span className="text-emerald-400 font-bold flex items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                    RUNNING
+                  </span>
                 </div>
-
-                <div className="p-1 rounded bg-[#091326]/60 border border-cyan-900/40">
-                  <span className="text-[9px] text-slate-400 block uppercase">NORMAL</span>
-                  <span className="text-xs font-black text-cyan-400">{flowStats.normal?.toLocaleString()}</span>
-                  <span className="text-[9px] text-emerald-400 block font-semibold">+10%</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">AI Engine (RF)</span>
+                  <span className="text-emerald-400 font-bold flex items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                    RUNNING
+                  </span>
                 </div>
-
-                <div className="p-1 rounded bg-[#091326]/60 border border-cyan-900/40">
-                  <span className="text-[9px] text-slate-400 block uppercase">SUSPICIOUS</span>
-                  <span className="text-xs font-black text-amber-400">{flowStats.suspicious?.toLocaleString()}</span>
-                  <span className="text-[9px] text-rose-400 block font-semibold">-5%</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Rule Engine</span>
+                  <span className="text-emerald-400 font-bold flex items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                    RUNNING
+                  </span>
                 </div>
-
-                <div className="p-1 rounded bg-[#091326]/60 border border-cyan-900/40">
-                  <span className="text-[9px] text-slate-400 block uppercase">DoS</span>
-                  <span className="text-xs font-black text-rose-400">{flowStats.dos}</span>
-                  <span className="text-[9px] text-rose-400 block font-semibold">+3%</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">WebSocket</span>
+                  <span className="text-emerald-400 font-bold flex items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                    CONNECTED
+                  </span>
                 </div>
-
-                <div className="p-1 rounded bg-[#091326]/60 border border-cyan-900/40">
-                  <span className="text-[9px] text-slate-400 block uppercase">PortScan</span>
-                  <span className="text-xs font-black text-amber-400">{flowStats.portscan}</span>
-                  <span className="text-[9px] text-rose-400 block font-semibold">+8%</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Database (SQLite)</span>
+                  <span className="text-emerald-400 font-bold flex items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                    ACTIVE
+                  </span>
                 </div>
-
-                <div className="p-1 rounded bg-[#091326]/60 border border-cyan-900/40">
-                  <span className="text-[9px] text-slate-400 block uppercase">BruteForce</span>
-                  <span className="text-xs font-black text-purple-400">{flowStats.bruteforce}</span>
-                  <span className="text-[9px] text-rose-400 block font-semibold">+4%</span>
-                </div>
-
-                <div className="p-1 rounded bg-[#091326]/60 border border-cyan-900/40">
-                  <span className="text-[9px] text-slate-400 block uppercase">Botnet</span>
-                  <span className="text-xs font-black text-pink-400">{flowStats.botnet}</span>
-                  <span className="text-[9px] text-rose-400 block font-semibold">+4%</span>
-                </div>
-
-                <div className="p-1 rounded bg-red-950/40 border border-red-500/40 animate-pulse">
-                  <span className="text-[9px] text-red-300 block uppercase">ACTIVE ALERTS</span>
-                  <span className="text-xs font-black text-red-400">{flowStats.active_alerts}</span>
-                  <span className="text-[9px] text-red-300 block font-semibold">CRITICAL</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Backend API</span>
+                  <span className="text-emerald-400 font-bold flex items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                    RUNNING
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Right 5 Columns: Attack Stats (185px) + Traffic Graph (185px) */}
-            <div className="lg:col-span-5 flex flex-col justify-between space-y-2.5">
-              {/* Box 1: Live Attack Statistics */}
-              <div className="h-[185px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                    LIVE ATTACK STATISTICS
-                  </h4>
-                  <button
-                    onClick={() => handleMaximize('ATTACK_STATS')}
-                    className="p-1 hover:bg-cyan-950 rounded text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
-                    title="Expand Attack Statistics to Big Size"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  {/* Donut Chart */}
-                  <div className="relative w-28 h-28 flex-shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={donutData}
-                          innerRadius={32}
-                          outerRadius={50}
-                          paddingAngle={3}
-                          dataKey="value"
-                        >
-                          {donutData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center font-mono select-none">
-                      <span className="text-xs font-black text-white">{flowStats.total_flows?.toLocaleString()}</span>
-                      <span className="text-[8px] text-slate-400">Total Flows</span>
-                    </div>
-                  </div>
-
-                  {/* Legend List */}
-                  <div className="flex-1 pl-3 space-y-1 font-mono text-[10px]">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center text-slate-300">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400 mr-1.5"></span>
-                        Normal (Benign)
-                      </span>
-                      <span className="font-bold text-white">{flowStats.normal?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center text-slate-300">
-                        <span className="w-2 h-2 rounded-full bg-red-500 mr-1.5"></span>
-                        DoS
-                      </span>
-                      <span className="font-bold text-red-400">{flowStats.dos}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center text-slate-300">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span>
-                        PortScan
-                      </span>
-                      <span className="font-bold text-amber-400">{flowStats.portscan}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center text-slate-300">
-                        <span className="w-2 h-2 rounded-full bg-purple-400 mr-1.5"></span>
-                        BruteForce
-                      </span>
-                      <span className="font-bold text-purple-400">{flowStats.bruteforce}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center text-slate-300">
-                        <span className="w-2 h-2 rounded-full bg-pink-400 mr-1.5"></span>
-                        Botnet
-                      </span>
-                      <span className="font-bold text-pink-400">{flowStats.botnet}</span>
-                    </div>
-                  </div>
-                </div>
+            {/* Box 2: NETWORK INTERFACE MONITORING */}
+            <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md space-y-2.5">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                  NETWORK INTERFACE
+                </h4>
+                <button
+                  onClick={() => handleMaximize('SYSTEM_STATUS')}
+                  className="p-1 rounded hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                  title="Expand Interface to Big Size"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              {/* Box 2: Real-Time Network Traffic Graph */}
-              <div className="h-[185px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                    REAL-TIME NETWORK TRAFFIC
-                  </h4>
-                  <div className="flex items-center space-x-2 text-[10px] font-mono">
-                    <span className="flex items-center text-cyan-400">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 mr-1"></span>
-                      Incoming
-                    </span>
-                    <span className="flex items-center text-purple-400">
-                      <span className="w-2 h-2 rounded-full bg-purple-400 mr-1"></span>
-                      Outgoing
-                    </span>
-                    <button
-                      onClick={() => handleMaximize('TRAFFIC_GRAPH')}
-                      className="p-1 hover:bg-cyan-950 rounded text-slate-400 hover:text-cyan-300 transition-colors ml-1 cursor-pointer"
-                      title="Expand Traffic Graph to Big Size"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
+              {/* Interface Selector Dropdown */}
+              <select
+                value={selectedInterface}
+                onChange={(e) => onSelectInterface && onSelectInterface(e.target.value)}
+                className="w-full bg-[#050811] border border-cyan-900/40 rounded px-2 py-1 text-xs text-cyan-300 font-mono truncate focus:outline-none focus:border-cyan-400"
+              >
+                <option value="DEFAULT">Intel(R) Wi-Fi 6 AX201 (Default)</option>
+                {interfaces && interfaces.map((iface) => (
+                  <option key={iface.id} value={iface.id}>
+                    {iface.name} ({iface.ip || 'No IP'})
+                  </option>
+                ))}
+              </select>
 
-                <div className="h-[135px] w-full pt-1">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trafficData}>
-                      <defs>
-                        <linearGradient id="incGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.6}/>
-                          <stop offset="95%" stopColor="#06B6D4" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="outGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.5}/>
-                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="time" stroke="#475569" fontSize={9} font="monospace" />
-                      <YAxis stroke="#475569" fontSize={9} font="monospace" />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#050811', borderColor: '#06B6D4', fontSize: '11px', fontFamily: 'monospace' }}
-                      />
-                      <Area type="monotone" dataKey="incoming" stroke="#06B6D4" strokeWidth={2} fillOpacity={1} fill="url(#incGrad)" />
-                      <Area type="monotone" dataKey="outgoing" stroke="#8B5CF6" strokeWidth={2} fillOpacity={1} fill="url(#outGrad)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+              {/* Sniffer Capture Status & Controls */}
+              <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                <span className="text-slate-400">Capture:</span>
+                <span className={`font-bold flex items-center ${snifferRunning ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${snifferRunning ? 'bg-emerald-400 animate-ping' : 'bg-rose-400'}`}></span>
+                  {snifferRunning ? 'RUNNING' : 'STOPPED'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <button
+                  onClick={() => onToggleSniffer && onToggleSniffer(true)}
+                  disabled={snifferRunning}
+                  className={`flex items-center justify-center space-x-1 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                    snifferRunning 
+                      ? 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'
+                      : 'bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/50'
+                  }`}
+                >
+                  <Play className="w-3 h-3" />
+                  <span>Start</span>
+                </button>
+                <button
+                  onClick={() => onToggleSniffer && onToggleSniffer(false)}
+                  disabled={!snifferRunning}
+                  className={`flex items-center justify-center space-x-1 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                    !snifferRunning 
+                      ? 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'
+                      : 'bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/50'
+                  }`}
+                >
+                  <Square className="w-3 h-3" />
+                  <span>Stop</span>
+                </button>
+              </div>
+
+              {/* Telemetry Metrics */}
+              <div className="text-[11px] font-mono space-y-1.5 pt-1 border-t border-slate-800/60 text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Packets/s:</span>
+                  <span className="font-bold text-cyan-400">{currentPps} pkt/s</span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Bandwidth:</span>
+                  <span className="font-bold text-white">{bandwidthMbps || (currentPps * 0.008).toFixed(2)} Mb/s</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Total Packets:</span>
+                  <span className="font-bold text-white">{(totalPackets || flowStats.total_flows)?.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Box 3: TOP SOURCE IPs */}
+            <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md space-y-2">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                  TOP SOURCE IPs (Live)
+                </h4>
+                <button
+                  onClick={() => handleMaximize('TOP_TRAFFIC')}
+                  className="p-1 rounded hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                  title="Expand Top IPs to Big Size"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="space-y-2 text-[11px] font-mono">
+                {displayIps.length > 0 ? (
+                  displayIps.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="space-y-0.5">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="truncate max-w-[130px] text-cyan-300" title={item.ip}>{item.ip}</span>
+                        <span className="font-bold text-white">{item.percentage}%</span>
+                      </div>
+                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(5, item.percentage))}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-[10px] text-slate-500 py-1 italic">
+                    Awaiting active source traffic...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Box 4: TOP DESTINATION PORTS */}
+            <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md space-y-2">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                  TOP DESTINATION PORTS
+                </h4>
+                <button
+                  onClick={() => handleMaximize('TOP_TRAFFIC')}
+                  className="p-1 rounded hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                  title="Expand Top Ports to Big Size"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="space-y-2 text-[11px] font-mono">
+                {displayPorts.length > 0 ? (
+                  displayPorts.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="space-y-0.5">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-200">{item.label}</span>
+                        <span className="font-bold text-white">{item.percentage}%</span>
+                      </div>
+                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(5, item.percentage))}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-[10px] text-slate-500 py-1 italic">
+                    Awaiting flow port statistics...
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* ========================================================= */}
-          {/* ROW 2: Event Stream (Left 7) vs Live Terminal (Right 5)    */}
-          {/* Symmetrical height: Both boxes are exactly 265px          */}
+          {/* COLUMN 2 (CENTER, 5 cols): Map, KPI Strip, Event Stream    */}
           {/* ========================================================= */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
-            {/* Live Network Event Stream (7 Columns) */}
-            <div className="lg:col-span-7 bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md h-[265px] flex flex-col justify-between">
+          <div className="xl:col-span-5 space-y-3">
+            {/* Global Threat Map */}
+            <div>
+              <GlobalThreatMap 
+                threatNodes={data?.threat_map_nodes || []} 
+                onMaximize={() => handleMaximize('MAP')}
+              />
+            </div>
+
+            {/* 8 KPI Metrics Strip: Strictly Identical Heights, No Big No Small */}
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 bg-[#070D19] border border-cyan-900/30 p-2 rounded-xl shadow-md font-mono text-center items-center">
+              {kpiCards.map((card, idx) => (
+                <div 
+                  key={idx} 
+                  className={`h-[68px] min-h-[68px] max-h-[68px] flex flex-col justify-between items-center text-center p-1.5 rounded-lg border ${card.bgClass} ${card.borderClass}`}
+                >
+                  {/* Title label: fixed height 18px */}
+                  <span className={`h-[18px] text-[9px] font-bold uppercase tracking-wider block w-full truncate leading-tight flex items-center justify-center ${card.labelClass}`}>
+                    {card.label}
+                  </span>
+                  {/* Count: fixed height 22px */}
+                  <span className={`h-[22px] text-xs sm:text-sm font-black flex items-center justify-center leading-none ${card.valClass}`}>
+                    {card.value}
+                  </span>
+                  {/* Delta badge: fixed height 14px */}
+                  <span className={`h-[14px] text-[9px] font-semibold flex items-center justify-center leading-none ${card.deltaClass}`}>
+                    {card.delta}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Live Network Event Stream */}
+            <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md h-[270px] flex flex-col justify-between">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                   LIVE NETWORK EVENT STREAM (Real-Time)
@@ -514,13 +667,13 @@ export default function SecurityOverview({
                 <table className="w-full text-left font-mono text-[11px]">
                   <thead className="text-slate-400 uppercase text-[10px] border-b border-slate-800/80">
                     <tr>
-                      <th className="py-1 px-2">TIME</th>
-                      <th className="py-1 px-2">SRC IP : PORT</th>
-                      <th className="py-1 px-2">DST IP : PORT</th>
-                      <th className="py-1 px-2">PROTO</th>
-                      <th className="py-1 px-2">PREDICTION</th>
-                      <th className="py-1 px-2">CONF.</th>
-                      <th className="py-1 px-2">TYPE</th>
+                      <th className="py-1 px-1.5">TIME</th>
+                      <th className="py-1 px-1.5">SRC IP : PORT</th>
+                      <th className="py-1 px-1.5">DST IP : PORT</th>
+                      <th className="py-1 px-1.5">PROTO</th>
+                      <th className="py-1 px-1.5">PREDICTION</th>
+                      <th className="py-1 px-1.5">CONF.</th>
+                      <th className="py-1 px-1.5">TYPE</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
@@ -532,17 +685,17 @@ export default function SecurityOverview({
 
                       return (
                         <tr key={idx} className="hover:bg-slate-900/40 transition-colors">
-                          <td className={`py-1 px-2 ${isThreat ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                          <td className={`py-1 px-1.5 ${isThreat ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
                             {timeStr}
                           </td>
-                          <td className="py-1 px-2 text-cyan-300 truncate max-w-[130px]" title={ev.src_ip}>
+                          <td className="py-1 px-1.5 text-cyan-300 truncate max-w-[110px]" title={ev.src_ip}>
                             {ev.src_ip}:{ev.src_port || 0}
                           </td>
-                          <td className="py-1 px-2 text-slate-300 truncate max-w-[130px]" title={ev.dst_ip}>
+                          <td className="py-1 px-1.5 text-slate-300 truncate max-w-[110px]" title={ev.dst_ip}>
                             {ev.dst_ip}:{ev.dst_port || 0}
                           </td>
-                          <td className="py-1 px-2 text-slate-400 font-bold">{ev.protocol || 'TCP'}</td>
-                          <td className="py-1 px-2 font-bold">
+                          <td className="py-1 px-1.5 text-slate-400 font-bold">{ev.protocol || 'TCP'}</td>
+                          <td className="py-1 px-1.5 font-bold">
                             <span className={
                               isPortScan ? 'text-rose-400' :
                               isBruteForce ? 'text-amber-400' :
@@ -552,11 +705,11 @@ export default function SecurityOverview({
                               {ev.prediction}
                             </span>
                           </td>
-                          <td className="py-1 px-2 text-slate-300 font-bold">
+                          <td className="py-1 px-1.5 text-slate-300 font-bold">
                             {((ev.confidence || 0.95) * 1).toFixed(2)}
                           </td>
-                          <td className="py-1 px-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          <td className="py-1 px-1.5">
+                            <span className={`px-1 py-0.2 rounded text-[9px] font-bold ${
                               isPortScan || isBruteForce 
                                 ? 'bg-rose-950 text-rose-300 border border-rose-500/40' 
                                 : 'bg-purple-950 text-purple-300 border border-purple-500/40'
@@ -571,9 +724,144 @@ export default function SecurityOverview({
                 </table>
               </div>
             </div>
+          </div>
 
-            {/* Live Terminal (5 Columns) */}
-            <div className="lg:col-span-5 h-[265px]">
+          {/* ========================================================= */}
+          {/* COLUMN 3 (RIGHT, 4 cols): Stats, Traffic Waveform, Terminal*/}
+          {/* ========================================================= */}
+          <div className="xl:col-span-4 space-y-3">
+            {/* Box 1: Live Attack Statistics */}
+            <div className="h-[185px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                  LIVE ATTACK STATISTICS
+                </h4>
+                <button
+                  onClick={() => handleMaximize('ATTACK_STATS')}
+                  className="p-1 hover:bg-cyan-950 rounded text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                  title="Expand Attack Statistics to Big Size"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                {/* Donut Chart */}
+                <div className="relative w-28 h-28 flex-shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={donutData}
+                        innerRadius={32}
+                        outerRadius={50}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {donutData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center font-mono select-none">
+                    <span className="text-xs font-black text-white">{flowStats.total_flows?.toLocaleString()}</span>
+                    <span className="text-[8px] text-slate-400">Total Flows</span>
+                  </div>
+                </div>
+
+                {/* Legend List */}
+                <div className="flex-1 pl-3 space-y-1 font-mono text-[10px]">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 mr-1.5"></span>
+                      Normal (Benign)
+                    </span>
+                    <span className="font-bold text-white">{flowStats.normal?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-red-500 mr-1.5"></span>
+                      DoS
+                    </span>
+                    <span className="font-bold text-red-400">{flowStats.dos}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span>
+                      PortScan
+                    </span>
+                    <span className="font-bold text-amber-400">{flowStats.portscan}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-purple-400 mr-1.5"></span>
+                      BruteForce
+                    </span>
+                    <span className="font-bold text-purple-400">{flowStats.bruteforce}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-slate-300">
+                      <span className="w-2 h-2 rounded-full bg-pink-400 mr-1.5"></span>
+                      Botnet
+                    </span>
+                    <span className="font-bold text-pink-400">{flowStats.botnet}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Box 2: Real-Time Network Traffic Graph */}
+            <div className="h-[185px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                  REAL-TIME NETWORK TRAFFIC
+                </h4>
+                <div className="flex items-center space-x-2 text-[10px] font-mono">
+                  <span className="flex items-center text-cyan-400">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 mr-1"></span>
+                    Incoming
+                  </span>
+                  <span className="flex items-center text-purple-400">
+                    <span className="w-2 h-2 rounded-full bg-purple-400 mr-1"></span>
+                    Outgoing
+                  </span>
+                  <button
+                    onClick={() => handleMaximize('TRAFFIC_GRAPH')}
+                    className="p-1 hover:bg-cyan-950 rounded text-slate-400 hover:text-cyan-300 transition-colors ml-1 cursor-pointer"
+                    title="Expand Traffic Graph to Big Size"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-[135px] w-full pt-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trafficData}>
+                    <defs>
+                      <linearGradient id="incGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.6}/>
+                        <stop offset="95%" stopColor="#06B6D4" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="outGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.5}/>
+                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="time" stroke="#475569" fontSize={9} font="monospace" />
+                    <YAxis stroke="#475569" fontSize={9} font="monospace" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#050811', borderColor: '#06B6D4', fontSize: '11px', fontFamily: 'monospace' }}
+                    />
+                    <Area type="monotone" dataKey="incoming" stroke="#06B6D4" strokeWidth={2} fillOpacity={1} fill="url(#incGrad)" />
+                    <Area type="monotone" dataKey="outgoing" stroke="#8B5CF6" strokeWidth={2} fillOpacity={1} fill="url(#outGrad)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Box 3: Live Terminal (IDS Engine) */}
+            <div className="h-[270px]">
               <LiveTerminal 
                 liveEvents={liveEvents} 
                 liveAlerts={liveAlerts}
@@ -584,9 +872,9 @@ export default function SecurityOverview({
           </div>
 
           {/* ========================================================= */}
-          {/* ROW 3: Full Width Recent Security Alerts Table             */}
+          {/* ROW 3: RECENT SECURITY ALERTS (Spanning below columns)     */}
           {/* ========================================================= */}
-          <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3.5 shadow-md space-y-2.5">
+          <div className="xl:col-span-12 bg-[#070D19] border border-cyan-900/30 rounded-xl p-3.5 shadow-md space-y-2.5">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <ShieldAlert className="w-4 h-4 text-red-500" />
@@ -597,14 +885,14 @@ export default function SecurityOverview({
               <div className="flex items-center space-x-3">
                 <button
                   onClick={onNavigateToThreats}
-                  className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline"
+                  className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
                 >
-                  View All {alertsList.length} Alerts &rarr;
+                  View All Alerts in Threat Center
                 </button>
                 <button
-                  onClick={() => handleMaximize('ALERTS')}
+                  onClick={() => handleMaximize('SECURITY_ALERTS')}
                   className="p-1 hover:bg-cyan-950 rounded text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
-                  title="Expand Alerts to Big Size"
+                  title="Expand Alerts Table to Big Size"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
                 </button>
@@ -615,71 +903,80 @@ export default function SecurityOverview({
               <table className="w-full text-left font-mono text-[11px]">
                 <thead className="text-slate-400 uppercase text-[10px] border-b border-slate-800/80">
                   <tr>
-                    <th className="py-2 px-2.5">TIME</th>
-                    <th className="py-2 px-2.5">SEVERITY</th>
-                    <th className="py-2 px-2.5">CATEGORY</th>
-                    <th className="py-2 px-2.5">DESCRIPTION</th>
-                    <th className="py-2 px-2.5">SOURCE IP</th>
-                    <th className="py-2 px-2.5">DEST IP</th>
-                    <th className="py-2 px-2.5">METHOD</th>
-                    <th className="py-2 px-2.5">CONF.</th>
-                    <th className="py-2 px-2.5">STATUS</th>
-                    <th className="py-2 px-2.5 text-center">ACTIONS</th>
+                    <th className="py-2 px-3">TIME</th>
+                    <th className="py-2 px-3">SEVERITY</th>
+                    <th className="py-2 px-3">CATEGORY</th>
+                    <th className="py-2 px-3">DESCRIPTION</th>
+                    <th className="py-2 px-3">SOURCE IP</th>
+                    <th className="py-2 px-3">DEST IP</th>
+                    <th className="py-2 px-3">METHOD</th>
+                    <th className="py-2 px-3">CONF.</th>
+                    <th className="py-2 px-3">STATUS</th>
+                    <th className="py-2 px-3 text-right">ACTIONS</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {filteredAlerts.map((alert) => {
-                    const timeStr = alert.timestamp?.split('T')[1]?.slice(0, 8) || '00:00:00';
-                    return (
+                <tbody className="divide-y divide-slate-800/40">
+                  {filteredAlerts.length > 0 ? (
+                    filteredAlerts.map((alert) => (
                       <tr key={alert.id} className="hover:bg-slate-900/40 transition-colors">
-                        <td className="py-2 px-2.5 text-slate-400">{timeStr}</td>
-                        <td className="py-2 px-2.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/40' :
-                            alert.severity === 'HIGH' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' :
-                            'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                          }`}>
+                        <td className="py-2 px-3 text-slate-400">
+                          {alert.timestamp?.split('T')[1]?.slice(0, 8) || '00:00:00'}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              alert.severity === 'CRITICAL'
+                                ? 'bg-red-950 text-red-400 border border-red-500/50'
+                                : alert.severity === 'HIGH'
+                                ? 'bg-rose-950 text-rose-300 border border-rose-500/40'
+                                : 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                            }`}
+                          >
                             {alert.severity}
                           </span>
                         </td>
-                        <td className="py-2 px-2.5 font-bold text-white">{alert.threat_category}</td>
-                        <td className="py-2 px-2.5 text-slate-300 max-w-xs truncate" title={alert.description}>
+                        <td className="py-2 px-3 font-bold text-white">{alert.attack_category}</td>
+                        <td className="py-2 px-3 text-slate-300 max-w-xs truncate" title={alert.description}>
                           {alert.description}
                         </td>
-                        <td className="py-2 px-2.5 text-cyan-300 font-bold">{alert.src_ip}</td>
-                        <td className="py-2 px-2.5 text-slate-300">{alert.dst_ip}:{alert.dst_port || 0}</td>
-                        <td className="py-2 px-2.5 text-slate-400">{alert.detection_type}</td>
-                        <td className="py-2 px-2.5 text-emerald-400 font-bold">
-                          {((alert.confidence || 0.95) * 1).toFixed(2)}
+                        <td className="py-2 px-3 text-cyan-400">{alert.source_ip}</td>
+                        <td className="py-2 px-3 text-slate-300">{alert.destination_ip || '127.0.0.1'}</td>
+                        <td className="py-2 px-3 text-slate-400">{alert.detection_method}</td>
+                        <td className="py-2 px-3 font-bold text-white">
+                          {((alert.confidence_score || 0.95) * 1).toFixed(2)}
                         </td>
-                        <td className="py-2 px-2.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            alert.status === 'RESOLVED' ? 'bg-emerald-950 text-emerald-300' :
-                            alert.status === 'FALSE_POSITIVE' ? 'bg-slate-800 text-slate-400' :
-                            'bg-red-950 text-red-300 border border-red-500/50'
-                          }`}>
+                        <td className="py-2 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              alert.status === 'OPEN'
+                                ? 'bg-red-950 text-red-300 border border-red-500/50'
+                                : alert.status === 'INVESTIGATING'
+                                ? 'bg-blue-950 text-blue-300 border border-blue-500/50'
+                                : 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
+                            }`}
+                          >
                             {alert.status}
                           </span>
                         </td>
-                        <td className="py-2 px-2.5 text-center">
-                          <div className="flex items-center justify-center space-x-1.5">
+                        <td className="py-2 px-3 text-right">
+                          <div className="flex items-center justify-end space-x-1.5">
                             <button
                               onClick={() => setExplainingAlert(alert)}
-                              className="p-1 hover:bg-cyan-900/40 rounded text-cyan-400 hover:text-cyan-300 transition-colors"
-                              title="Investigate with Explainable AI"
+                              className="p-1 bg-[#091326] hover:bg-cyan-950 text-cyan-400 rounded border border-cyan-800/40 transition-colors cursor-pointer"
+                              title="Investigate with AI Explainability"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleStatusChange(alert.id, 'RESOLVED')}
-                              className="p-1 hover:bg-emerald-900/40 rounded text-emerald-400 hover:text-emerald-300 transition-colors"
+                              className="p-1 bg-[#091326] hover:bg-emerald-950 text-emerald-400 rounded border border-emerald-800/40 transition-colors cursor-pointer"
                               title="Mark as Resolved"
                             >
                               <Check className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleStatusChange(alert.id, 'FALSE_POSITIVE')}
-                              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-300 transition-colors"
+                              className="p-1 bg-[#091326] hover:bg-rose-950 text-rose-400 rounded border border-rose-800/40 transition-colors cursor-pointer"
                               title="Mark as False Positive"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -687,43 +984,26 @@ export default function SecurityOverview({
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={10} className="py-4 text-center text-slate-500 italic">
+                        No recent security alerts recorded in database.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* Explainable AI Modal */}
+      {/* AI Decision Explainer Modal */}
       {explainingAlert && (
         <AiExplainerModal
           alert={explainingAlert}
           onClose={() => setExplainingAlert(null)}
-        />
-      )}
-
-      {/* Standalone Big-Size Modal (when triggered locally) */}
-      {localMaximized && (
-        <MaximizedPanelModal
-          panelType={localMaximized}
-          onClose={() => setLocalMaximized(null)}
-          data={data}
-          pulseHistory={pulseHistory}
-          liveEvents={liveEvents}
-          liveAlerts={liveAlerts}
-          currentPps={currentPps}
-          currentInterface={currentInterface}
-          flowStats={flowStats}
-          donutData={donutData}
-          trafficData={trafficData}
-          combinedEvents={combinedEvents}
-          filteredAlerts={filteredAlerts}
-          topSourceIps={data?.top_source_ips || []}
-          topDestPorts={data?.top_dest_ports || []}
-          onStatusChange={handleStatusChange}
-          onSelectAlertForExplanation={(alert) => setExplainingAlert(alert)}
         />
       )}
     </div>

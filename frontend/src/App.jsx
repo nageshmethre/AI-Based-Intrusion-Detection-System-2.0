@@ -143,21 +143,10 @@ export default function App() {
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           alertCount={openAlertCount}
-          interfaces={interfaces}
-          selectedInterface={selectedInterfaceId}
-          onSelectInterface={handleSelectInterface}
-          snifferRunning={snifferRunning}
-          onToggleSniffer={handleToggleSniffer}
-          pps={currentPps}
-          bandwidthMbps={bandwidthMbps}
-          totalPackets={totalPackets}
-          topSourceIps={topSourceIps}
-          topDestPorts={topDestPorts}
-          onOpenMaximized={(panel) => setMaximizedPanel(panel)}
         />
 
         {/* Dynamic Main Workspace Content */}
-        <main className="flex-1 p-5 overflow-y-auto bg-[#050811]">
+        <main className="flex-1 p-4 lg:p-5 overflow-y-auto bg-[#050811]">
           {activeTab === 'overview' && (
             <SecurityOverview 
               pulseHistory={pulseHistory} 
@@ -165,6 +154,15 @@ export default function App() {
               liveAlerts={liveAlerts}
               currentPps={currentPps}
               currentInterface={currentInterface}
+              interfaces={interfaces}
+              selectedInterface={selectedInterfaceId}
+              onSelectInterface={handleSelectInterface}
+              snifferRunning={snifferRunning}
+              onToggleSniffer={handleToggleSniffer}
+              totalPackets={totalPackets}
+              bandwidthMbps={bandwidthMbps}
+              topSourceIps={topSourceIps}
+              topDestPorts={topDestPorts}
               onNavigateToThreats={() => setActiveTab('threats')} 
               onOpenMaximized={(panel) => setMaximizedPanel(panel)}
             />
