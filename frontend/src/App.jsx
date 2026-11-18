@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import TopNav from './components/TopNav';
-import HackerSidebar from './components/HackerSidebar';
 import SecurityOverview from './pages/SecurityOverview';
 import LiveMonitoring from './pages/LiveMonitoring';
 import ThreatDetection from './pages/ThreatDetection';
@@ -136,17 +135,8 @@ export default function App() {
         alertCount={openAlertCount} 
       />
 
-      {/* Main Container: Sidebar + Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Hacker SOC Sidebar */}
-        <HackerSidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          alertCount={openAlertCount}
-        />
-
-        {/* Dynamic Main Workspace Content */}
-        <main className="flex-1 p-4 lg:p-5 overflow-y-auto bg-[#050811]">
+      {/* Dynamic Main Workspace Content (Full Width) */}
+      <main className="flex-1 p-3 sm:p-4 lg:p-5 overflow-y-auto bg-[#050811]">
           {activeTab === 'overview' && (
             <SecurityOverview 
               pulseHistory={pulseHistory} 
@@ -192,7 +182,6 @@ export default function App() {
             <GuideHelpCenter onNavigateTab={(tab) => setActiveTab(tab)} />
           )}
         </main>
-      </div>
 
       {/* Global Big-Size Maximized Panel Modal with 'X' Mark to Minimize */}
       {maximizedPanel && (

@@ -363,12 +363,12 @@ export default function SecurityOverview({
         </div>
       ) : (
         /* Symmetrical 3-Column SOC Defender Command Center matching Reference Image */
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-3.5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
           
           {/* ========================================================= */}
           {/* COLUMN 1 (LEFT, 3 cols): System Status, NIC, Top IPs & Ports */}
           {/* ========================================================= */}
-          <div className="xl:col-span-3 space-y-3">
+          <div className="lg:col-span-3 space-y-3">
             {/* Box 1: SYSTEM STATUS */}
             <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md space-y-2">
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
@@ -592,7 +592,7 @@ export default function SecurityOverview({
           {/* ========================================================= */}
           {/* COLUMN 2 (CENTER, 5 cols): Map, KPI Strip, Event Stream    */}
           {/* ========================================================= */}
-          <div className="xl:col-span-5 space-y-3">
+          <div className="lg:col-span-5 space-y-3">
             {/* Global Threat Map */}
             <div>
               <GlobalThreatMap 
@@ -602,22 +602,22 @@ export default function SecurityOverview({
             </div>
 
             {/* 8 KPI Metrics Strip: Strictly Identical Heights, No Big No Small */}
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 bg-[#070D19] border border-cyan-900/30 p-2 rounded-xl shadow-md font-mono text-center items-center">
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 bg-[#070D19] border border-cyan-900/30 p-2 rounded-xl shadow-md text-center items-center">
               {kpiCards.map((card, idx) => (
                 <div 
                   key={idx} 
                   className={`h-[68px] min-h-[68px] max-h-[68px] flex flex-col justify-between items-center text-center p-1.5 rounded-lg border ${card.bgClass} ${card.borderClass}`}
                 >
-                  {/* Title label: fixed height 18px */}
-                  <span className={`h-[18px] text-[9px] font-bold uppercase tracking-wider block w-full truncate leading-tight flex items-center justify-center ${card.labelClass}`}>
+                  {/* Title label */}
+                  <span className={`text-[10px] font-bold uppercase tracking-wider block w-full truncate leading-tight ${card.labelClass}`}>
                     {card.label}
                   </span>
-                  {/* Count: fixed height 22px */}
-                  <span className={`h-[22px] text-xs sm:text-sm font-black flex items-center justify-center leading-none ${card.valClass}`}>
+                  {/* Count */}
+                  <span className={`text-xs sm:text-sm font-mono font-black leading-none ${card.valClass}`}>
                     {card.value}
                   </span>
-                  {/* Delta badge: fixed height 14px */}
-                  <span className={`h-[14px] text-[9px] font-semibold flex items-center justify-center leading-none ${card.deltaClass}`}>
+                  {/* Delta badge */}
+                  <span className={`text-[10px] font-mono font-semibold leading-none ${card.deltaClass}`}>
                     {card.delta}
                   </span>
                 </div>
@@ -729,7 +729,7 @@ export default function SecurityOverview({
           {/* ========================================================= */}
           {/* COLUMN 3 (RIGHT, 4 cols): Stats, Traffic Waveform, Terminal*/}
           {/* ========================================================= */}
-          <div className="xl:col-span-4 space-y-3">
+          <div className="lg:col-span-4 space-y-3">
             {/* Box 1: Live Attack Statistics */}
             <div className="h-[185px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
               <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
@@ -874,7 +874,7 @@ export default function SecurityOverview({
           {/* ========================================================= */}
           {/* ROW 3: RECENT SECURITY ALERTS (Spanning below columns)     */}
           {/* ========================================================= */}
-          <div className="xl:col-span-12 bg-[#070D19] border border-cyan-900/30 rounded-xl p-3.5 shadow-md space-y-2.5">
+          <div className="lg:col-span-12 bg-[#070D19] border border-cyan-900/30 rounded-xl p-3.5 shadow-md space-y-2.5">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <ShieldAlert className="w-4 h-4 text-red-500" />
