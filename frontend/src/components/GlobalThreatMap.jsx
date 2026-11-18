@@ -54,7 +54,7 @@ export default function GlobalThreatMap({ threatNodes = [], onMaximize }) {
   }, [threatNodes]);
 
   return (
-    <div className="relative w-full h-[330px] bg-[#040814] border border-cyan-900/35 rounded-xl overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.85)] flex flex-col justify-between p-3.5 select-none">
+    <div className="relative w-full h-[280px] bg-[#040814] border border-cyan-900/35 rounded-xl overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.85)] flex flex-col justify-between p-3 select-none">
       {/* Top Header & Legend */}
       <div className="flex items-center justify-between z-10">
         <div className="flex items-center space-x-2">

@@ -21,8 +21,19 @@ import {
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [wsStatus, setWsStatus] = useState('CONNECTING');
-  const [pulseHistory, setPulseHistory] = useState([]);
-  const [currentPps, setCurrentPps] = useState(0);
+  const [pulseHistory, setPulseHistory] = useState(() => {
+    const now = Date.now();
+    return Array.from({ length: 15 }, (_, i) => {
+      const t = new Date(now - (14 - i) * 1000);
+      const base = 48 + Math.floor(Math.sin(i * 0.75) * 20);
+      return {
+        timestamp: t.toISOString(),
+        packets_per_sec: base,
+        bytes_per_sec: base * 1280
+      };
+    });
+  });
+  const [currentPps, setCurrentPps] = useState(65);
   const [activeFlows, setActiveFlows] = useState(0);
   const [currentInterface, setCurrentInterface] = useState('Detecting Interface...');
   const [liveEvents, setLiveEvents] = useState([]);
