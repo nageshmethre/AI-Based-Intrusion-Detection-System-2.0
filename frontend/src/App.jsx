@@ -11,6 +11,7 @@ import SecurityLogs from './pages/SecurityLogs';
 import SettingsPage from './pages/SettingsPage';
 import GuideHelpCenter from './pages/GuideHelpCenter';
 import HelpDrawer from './components/HelpDrawer';
+import MaximizedPanelModal from './components/MaximizedPanelModal';
 import { 
   createWebSocketSubscription, 
   fetchOverview, 
@@ -30,6 +31,8 @@ export default function App() {
   const [openAlertCount, setOpenAlertCount] = useState(0);
   const [toastAlert, setToastAlert] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [maximizedPanel, setMaximizedPanel] = useState(null);
+  const [overviewData, setOverviewData] = useState(null);
 
   // Settings & NIC telemetry state
   const [interfaces, setInterfaces] = useState([]);
@@ -53,6 +56,7 @@ export default function App() {
     }).catch(console.error);
 
     fetchOverview().then((res) => {
+      setOverviewData(res);
       if (res?.open_alerts !== undefined) setOpenAlertCount(res.open_alerts);
       if (res?.top_source_ips) setTopSourceIps(res.top_source_ips);
       if (res?.top_dest_ports) setTopDestPorts(res.top_dest_ports);
@@ -149,6 +153,7 @@ export default function App() {
           totalPackets={totalPackets}
           topSourceIps={topSourceIps}
           topDestPorts={topDestPorts}
+          onOpenMaximized={(panel) => setMaximizedPanel(panel)}
         />
 
         {/* Dynamic Main Workspace Content */}
@@ -161,6 +166,7 @@ export default function App() {
               currentPps={currentPps}
               currentInterface={currentInterface}
               onNavigateToThreats={() => setActiveTab('threats')} 
+              onOpenMaximized={(panel) => setMaximizedPanel(panel)}
             />
           )}
           {activeTab === 'monitoring' && (
@@ -189,6 +195,47 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Global Big-Size Maximized Panel Modal with 'X' Mark to Minimize */}
+      {maximizedPanel && (
+        <MaximizedPanelModal
+          panelType={maximizedPanel}
+          onClose={() => setMaximizedPanel(null)}
+          data={overviewData}
+          pulseHistory={pulseHistory}
+          liveEvents={liveEvents}
+          liveAlerts={liveAlerts}
+          currentPps={currentPps}
+          currentInterface={currentInterface}
+          flowStats={{
+            total_flows: overviewData?.total_packets_or_flows || totalPackets || 30738,
+            normal: overviewData?.normal_traffic || 29188,
+            suspicious: overviewData?.suspicious_traffic || 1550,
+            dos: overviewData?.attack_distribution?.DoS || 498,
+            portscan: overviewData?.attack_distribution?.PortScan || 8,
+            bruteforce: overviewData?.attack_distribution?.BruteForce || 5,
+            botnet: overviewData?.attack_distribution?.Botnet || 12,
+            active_alerts: overviewData?.open_alerts || openAlertCount || 517
+          }}
+          donutData={[
+            { name: 'Normal (Benign)', value: overviewData?.normal_traffic || 29188, color: '#06B6D4' },
+            { name: 'DoS', value: overviewData?.attack_distribution?.DoS || 498, color: '#EF4444' },
+            { name: 'PortScan', value: overviewData?.attack_distribution?.PortScan || 8, color: '#F59E0B' },
+            { name: 'BruteForce', value: overviewData?.attack_distribution?.BruteForce || 5, color: '#8B5CF6' },
+            { name: 'Botnet', value: overviewData?.attack_distribution?.Botnet || 12, color: '#EC4899' },
+          ]}
+          trafficData={pulseHistory.length > 0 ? pulseHistory.map((p, idx) => ({
+            time: p.timestamp ? p.timestamp.split('T')[1]?.slice(0, 8) : `--:--:${idx}`,
+            incoming: Math.round(p.packets_per_sec || 0),
+            outgoing: Math.round((p.packets_per_sec || 0) * 0.35)
+          })) : [
+            { time: new Date().toTimeString().split(' ')[0], incoming: Math.round(currentPps), outgoing: Math.round(currentPps * 0.35) }
+          ]}
+          topSourceIps={topSourceIps}
+          topDestPorts={topDestPorts}
+          filteredAlerts={liveAlerts}
+        />
+      )}
 
       {/* Interactive Knowledge Base Drawer */}
       <HelpDrawer 

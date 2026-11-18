@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal } from 'lucide-react';
+import { Terminal, Maximize2 } from 'lucide-react';
 import { fetchSystemLogs } from '../services/api';
 
-export default function LiveTerminal({ liveEvents = [], liveAlerts = [], currentInterface = 'Default' }) {
+export default function LiveTerminal({ liveEvents = [], liveAlerts = [], currentInterface = 'Default', onMaximize }) {
   const [logs, setLogs] = useState([]);
   const containerRef = useRef(null);
 
@@ -79,10 +79,21 @@ export default function LiveTerminal({ liveEvents = [], liveAlerts = [], current
             LIVE TERMINAL (IDS ENGINE)
           </h4>
         </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5 mr-1">
+            <span className="w-2 h-2 rounded-full bg-red-500/80 inline-block"></span>
+            <span className="w-2 h-2 rounded-full bg-amber-500/80 inline-block"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500/80 inline-block"></span>
+          </div>
+          {onMaximize && (
+            <button
+              onClick={onMaximize}
+              className="p-1 bg-[#060D1E] hover:bg-emerald-950 border border-slate-700/60 hover:border-emerald-500 text-slate-300 hover:text-emerald-300 rounded transition-all cursor-pointer"
+              title="Expand Terminal to Big Size"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

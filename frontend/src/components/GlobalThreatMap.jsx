@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { WORLD_MAP_PATH } from './worldMapPath';
-import { Activity, ShieldCheck, AlertTriangle, Network } from 'lucide-react';
+import { Activity, ShieldCheck, AlertTriangle, Network, X, Maximize2 } from 'lucide-react';
 
-export default function GlobalThreatMap({ threatNodes = [] }) {
+export default function GlobalThreatMap({ threatNodes = [], onMaximize }) {
+  const [showLocalOverlay, setShowLocalOverlay] = useState(false);
+
   // Destination Target: "Your System (Host)" - Indian Subcontinent (New Delhi / Bangalore region)
   // Formula: lon 77.2 -> x 714, lat 28.6 -> y 171
   const targetCoord = { x: 714, y: 171, label: 'Your System (Host)' };
@@ -62,20 +64,32 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
           </h4>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center space-x-4 text-[11px] font-mono text-slate-300 bg-[#060D1E]/90 px-3 py-1 rounded-lg border border-cyan-950 shadow-sm backdrop-blur">
-          <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-cyan-200 shadow-[0_0_8px_#38bdf8]"></span>
-            <span className="text-white font-semibold">Your System</span>
+        {/* Legend & Maximize */}
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-4 text-[11px] font-mono text-slate-300 bg-[#060D1E]/90 px-3 py-1 rounded-lg border border-cyan-950 shadow-sm backdrop-blur">
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-cyan-200 shadow-[0_0_8px_#38bdf8]"></span>
+              <span className="text-white font-semibold">Your System</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border border-red-300 shadow-[0_0_8px_#ef4444]"></span>
+              <span className="text-white font-semibold">Public Attack Source</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-3.5 h-0.5 bg-red-500 rounded"></span>
+              <span className="text-slate-300">Attack Flow</span>
+            </div>
           </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border border-red-300 shadow-[0_0_8px_#ef4444]"></span>
-            <span className="text-white font-semibold">Public Attack Source</span>
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3.5 h-0.5 bg-red-500 rounded"></span>
-            <span className="text-slate-300">Attack Flow</span>
-          </div>
+
+          {onMaximize && (
+            <button
+              onClick={onMaximize}
+              className="p-1.5 bg-[#060D1E] hover:bg-cyan-950 border border-cyan-900/50 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 rounded-lg transition-all cursor-pointer shadow-sm"
+              title="Expand to Big Size"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,17 +251,27 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
         </svg>
       </div>
 
-      {/* Internal Subnet / Loopback Activity Overlay Badge */}
-      {localThreats.length > 0 && (
-        <div className="absolute top-14 left-4 z-20 max-w-xs bg-[#030712]/90 border border-amber-500/40 rounded-lg p-2.5 font-mono text-[10px] text-slate-300 shadow-xl backdrop-blur">
-          <div className="flex items-center space-x-1.5 text-amber-400 font-bold uppercase mb-1">
-            <Network className="w-3.5 h-3.5" />
-            <span>Local Subnet / Host Threat Activity</span>
+      {/* Internal Subnet / Loopback Activity Overlay Badge with 'X' Mark to Remove */}
+      {showLocalOverlay && localThreats.length > 0 && (
+        <div className="absolute top-14 left-4 z-20 max-w-xs bg-[#030712]/95 border border-amber-500/60 rounded-xl p-3 font-mono text-[10px] text-slate-300 shadow-2xl backdrop-blur animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between text-amber-400 font-bold uppercase mb-2 pb-1 border-b border-amber-500/30">
+            <div className="flex items-center space-x-1.5">
+              <Network className="w-3.5 h-3.5" />
+              <span>Local Subnet Activity</span>
+            </div>
+            {/* 'X' mark to remove / dismiss this box */}
+            <button
+              onClick={() => setShowLocalOverlay(false)}
+              className="p-1 rounded-md hover:bg-rose-500/20 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title="Remove / Dismiss (X)"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="space-y-1">
-            {localThreats.slice(0, 3).map((lt) => (
-              <div key={lt.id} className="flex items-center justify-between text-[10px]">
-                <span className="text-cyan-300 font-bold">{lt.ip}</span>
+          <div className="space-y-1.5">
+            {localThreats.slice(0, 4).map((lt) => (
+              <div key={lt.id} className="flex items-center justify-between text-[10px] py-0.5 border-b border-slate-800/40 last:border-0">
+                <span className="text-cyan-300 font-bold truncate max-w-[130px]" title={lt.ip}>{lt.ip}</span>
                 <span className="text-red-400 font-semibold">{lt.category}</span>
                 <span className="text-slate-400">({lt.type})</span>
               </div>
@@ -263,7 +287,12 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
           <span>
             External Public Vectors: <strong className="text-white">{publicThreats.length} Active</strong>
             {localThreats.length > 0 && (
-              <span className="ml-2 text-amber-400 font-semibold">({localThreats.length} Local Detections)</span>
+              <button
+                onClick={() => setShowLocalOverlay(!showLocalOverlay)}
+                className="ml-2 text-amber-400 font-semibold hover:underline cursor-pointer bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30"
+              >
+                {showLocalOverlay ? 'Hide Local Detections [X]' : `(${localThreats.length} Local Detections • View)`}
+              </button>
             )}
           </span>
         </div>
