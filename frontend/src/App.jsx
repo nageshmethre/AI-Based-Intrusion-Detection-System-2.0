@@ -121,9 +121,11 @@ export default function App() {
         } 
         else if (type === 'NEW_ALERT' && data) {
           setLiveAlerts((prev) => [data, ...prev.slice(0, 99)]);
-          setOpenAlertCount((prev) => prev + 1);
+          if (data.status !== 'RESOLVED' && data.status !== 'RESOLVED_BY_AI') {
+            setOpenAlertCount((prev) => prev + 1);
+          }
           setToastAlert(data);
-          setTimeout(() => setToastAlert(null), 6000);
+          setTimeout(() => setToastAlert(null), 5000);
         }
       },
       (status) => {
@@ -213,7 +215,7 @@ export default function App() {
             portscan: overviewData?.attack_distribution?.PortScan || 8,
             bruteforce: overviewData?.attack_distribution?.BruteForce || 5,
             botnet: overviewData?.attack_distribution?.Botnet || 12,
-            active_alerts: overviewData?.open_alerts || openAlertCount || 517
+            active_alerts: overviewData?.open_alerts ?? openAlertCount ?? 0
           }}
           donutData={[
             { name: 'Normal (Benign)', value: overviewData?.normal_traffic || 29188, color: '#06B6D4' },
@@ -244,21 +246,21 @@ export default function App() {
 
       {/* Real-time Threat Alert Toast */}
       {toastAlert && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-red-950/90 border border-red-500 text-white p-4 rounded-xl shadow-2xl backdrop-blur animate-in slide-in-from-bottom duration-300">
+        <div className="fixed top-16 right-6 z-50 max-w-sm bg-[#081124]/95 border border-cyan-500/60 text-white p-3 rounded-xl shadow-2xl backdrop-blur animate-in slide-in-from-top duration-300">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 block mb-1">
-                🚨 Critical SOC Threat Alert
+              <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1 mb-0.5">
+                <span>⚡ Threat Neutralized & Resolved</span>
               </span>
-              <h5 className="text-sm font-bold font-mono">{toastAlert.title}</h5>
-              <p className="text-xs text-slate-300 mt-1">{toastAlert.description}</p>
-              <div className="mt-2 text-[11px] font-mono text-red-300">
-                Host: {toastAlert.src_ip} | Engine: {toastAlert.detection_type}
+              <h5 className="text-xs font-bold font-mono text-white">{toastAlert.title}</h5>
+              <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-2">{toastAlert.description}</p>
+              <div className="mt-1 text-[10px] font-mono text-cyan-300">
+                Host: {toastAlert.src_ip} &bull; Status: Auto-Mitigated
               </div>
             </div>
             <button 
               onClick={() => setToastAlert(null)}
-              className="text-slate-400 hover:text-white text-xs ml-3"
+              className="text-slate-400 hover:text-white text-xs ml-2 cursor-pointer p-1"
             >
               ✕
             </button>
