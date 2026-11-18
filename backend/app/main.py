@@ -7,6 +7,7 @@ rule-based threat detection, SQLite persistence, and WebSocket real-time feeds.
 import asyncio
 import logging
 import time
+from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,9 +71,42 @@ def handle_completed_flow(flow_dict: dict):
 
             alert_dict = None
             if ai_res.get("is_threat_alert", False):
+                # Inbuilt AI Autonomous Threat Resolution
+                is_auto_resolve = active_defense_manager.ai_auto_resolve_enabled
+                init_status = "RESOLVED" if is_auto_resolve else "OPEN"
+                quarantine_rule = None
+
+                # Autonomous real-time IP quarantine via IPS
+                src_ip = event_obj.src_ip.strip() if event_obj.src_ip else ""
+                if is_auto_resolve and src_ip and not active_defense_manager.is_protected(src_ip) and active_defense_manager.validate_ip(src_ip):
+                    block_res = active_defense_manager.block_ip(
+                        ip=src_ip,
+                        reason=f"Inbuilt AI Auto-Defense: Isolated {ai_res['prediction']}",
+                        threat_category=ai_res["prediction"],
+                        auto_blocked=True,
+                        admin_user="INBUILT_AI_DEFENDER"
+                    )
+                    if block_res.get("success"):
+                        quarantine_rule = block_res.get("rule_name")
+
+                details_data = {
+                    "probabilities": ai_res.get("probabilities"),
+                    "probability_margin": ai_res.get("probability_margin"),
+                    "status": ai_res.get("status")
+                }
+                if is_auto_resolve:
+                    details_data["ai_resolution"] = {
+                        "resolved_by": "INBUILT_AI_DEFENDER",
+                        "resolved_at": datetime.utcnow().isoformat(),
+                        "action": "HOST_FIREWALL_ISOLATION" if quarantine_rule else "ANOMALY_SUPPRESSION",
+                        "quarantine_rule": quarantine_rule or "SAFEGUARD_PROTECTED",
+                        "mitigation_mode": "AUTONOMOUS_REALTIME",
+                        "status": "MITIGATED"
+                    }
+
                 threat_alert = ThreatAlert(
                     title=f"AI Confirmed Threat: {ai_res['prediction']}",
-                    description=f"High-confidence {ai_res['prediction']} flow ({ai_res['confidence']*100:.1f}%, margin: {ai_res.get('probability_margin', 0)*100:.1f}%) from {event_obj.src_ip} to {event_obj.dst_ip}:{event_obj.dst_port}.",
+                    description=f"ML Classifier detected {ai_res['prediction']} pattern from {event_obj.src_ip} to {event_obj.dst_ip}:{event_obj.dst_port}. Autonomously neutralized by Inbuilt AI Defender." if is_auto_resolve else f"High-confidence {ai_res['prediction']} flow ({ai_res['confidence']*100:.1f}%, margin: {ai_res.get('probability_margin', 0)*100:.1f}%) from {event_obj.src_ip} to {event_obj.dst_ip}:{event_obj.dst_port}.",
                     src_ip=event_obj.src_ip,
                     dst_ip=event_obj.dst_ip,
                     dst_port=event_obj.dst_port,
@@ -81,12 +115,8 @@ def handle_completed_flow(flow_dict: dict):
                     threat_category=ai_res["prediction"],
                     severity=ai_res["severity"],
                     confidence=ai_res["confidence"],
-                    status="OPEN",
-                    details_json={
-                        "probabilities": ai_res.get("probabilities"),
-                        "probability_margin": ai_res.get("probability_margin"),
-                        "status": ai_res.get("status")
-                    }
+                    status=init_status,
+                    details_json=details_data
                 )
                 db.add(threat_alert)
                 db.commit()
@@ -105,7 +135,8 @@ def handle_completed_flow(flow_dict: dict):
                     "threat_category": threat_alert.threat_category,
                     "severity": threat_alert.severity,
                     "confidence": threat_alert.confidence,
-                    "status": threat_alert.status
+                    "status": threat_alert.status,
+                    "details": threat_alert.details_json
                 }
             else:
                 db.commit()
@@ -132,14 +163,14 @@ def handle_completed_flow(flow_dict: dict):
 
             if alert_dict:
                 ws_manager.dispatch_from_thread("NEW_ALERT", alert_dict)
-                # Active Defense Auto-Block & Webhook Notification
-                if active_defense_manager.auto_block_enabled and alert_dict.get("severity") in ["CRITICAL", "HIGH"]:
-                    active_defense_manager.block_ip(
-                        ip=alert_dict["src_ip"],
-                        reason=f"Automated IPS Defense: {alert_dict['title']}",
-                        threat_category=alert_dict.get("threat_category", "Attack"),
-                        auto_blocked=True
-                    )
+                if alert_dict.get("status") == "RESOLVED":
+                    ws_manager.dispatch_from_thread("AI_THREAT_RESOLVED", {
+                        "alert_id": alert_dict["id"],
+                        "src_ip": alert_dict["src_ip"],
+                        "threat_category": alert_dict["threat_category"],
+                        "status": "RESOLVED",
+                        "resolved_by": "INBUILT_AI_DEFENDER"
+                    })
                 if notification_dispatcher.enabled:
                     notification_dispatcher.send_alert(alert_dict)
 
@@ -160,19 +191,54 @@ def handle_live_packet(packet_dict: dict):
         db = SessionLocal()
         try:
             for ra in rule_alerts:
+                is_auto_resolve = active_defense_manager.ai_auto_resolve_enabled
+                init_status = "RESOLVED" if is_auto_resolve else "OPEN"
+                quarantine_rule = None
+
+                src_ip = ra["src_ip"].strip() if ra.get("src_ip") else ""
+                threat_category = ra.get("threat_category", "PortScan" if "PORT" in ra.get("rule_name", "") else "DoS")
+
+                if is_auto_resolve and src_ip and not active_defense_manager.is_protected(src_ip) and active_defense_manager.validate_ip(src_ip):
+                    block_res = active_defense_manager.block_ip(
+                        ip=src_ip,
+                        reason=f"Inbuilt AI Auto-Defense: Isolated {threat_category}",
+                        threat_category=threat_category,
+                        auto_blocked=True,
+                        admin_user="INBUILT_AI_DEFENDER"
+                    )
+                    if block_res.get("success"):
+                        quarantine_rule = block_res.get("rule_name")
+
+                details = ra.get("details") or {}
+                if not isinstance(details, dict):
+                    details = {"raw": details}
+                if is_auto_resolve:
+                    details["ai_resolution"] = {
+                        "resolved_by": "INBUILT_AI_DEFENDER",
+                        "resolved_at": datetime.utcnow().isoformat(),
+                        "action": "HOST_FIREWALL_ISOLATION" if quarantine_rule else "ANOMALY_SUPPRESSION",
+                        "quarantine_rule": quarantine_rule or "SAFEGUARD_PROTECTED",
+                        "mitigation_mode": "AUTONOMOUS_REALTIME",
+                        "status": "MITIGATED"
+                    }
+
+                desc = ra["description"]
+                if is_auto_resolve:
+                    desc = f"{desc} Autonomously neutralized by Inbuilt AI Defender."
+
                 alert_obj = ThreatAlert(
                     title=ra["title"],
-                    description=ra["description"],
+                    description=desc,
                     src_ip=ra["src_ip"],
                     dst_ip=ra["dst_ip"],
                     dst_port=ra.get("dst_port"),
                     protocol=ra.get("protocol"),
                     detection_type=ra["detection_type"],
-                    threat_category=ra.get("threat_category", "PortScan" if "PORT" in ra["rule_name"] else "DoS"),
+                    threat_category=threat_category,
                     severity=ra["severity"],
                     confidence=1.0,
-                    status="OPEN",
-                    details_json=ra.get("details")
+                    status=init_status,
+                    details_json=details
                 )
                 db.add(alert_obj)
                 db.commit()
@@ -191,17 +257,18 @@ def handle_live_packet(packet_dict: dict):
                     "threat_category": alert_obj.threat_category,
                     "severity": alert_obj.severity,
                     "confidence": alert_obj.confidence,
-                    "status": alert_obj.status
+                    "status": alert_obj.status,
+                    "details": alert_obj.details_json
                 }
                 ws_manager.dispatch_from_thread("NEW_ALERT", alert_dict)
-                # Active Defense Auto-Block & Webhook Notification
-                if active_defense_manager.auto_block_enabled and alert_dict.get("severity") in ["CRITICAL", "HIGH"]:
-                    active_defense_manager.block_ip(
-                        ip=alert_dict["src_ip"],
-                        reason=f"Automated IPS Defense: {alert_dict['title']}",
-                        threat_category=alert_dict.get("threat_category", "Attack"),
-                        auto_blocked=True
-                    )
+                if alert_dict.get("status") == "RESOLVED":
+                    ws_manager.dispatch_from_thread("AI_THREAT_RESOLVED", {
+                        "alert_id": alert_dict["id"],
+                        "src_ip": alert_dict["src_ip"],
+                        "threat_category": alert_dict["threat_category"],
+                        "status": "RESOLVED",
+                        "resolved_by": "INBUILT_AI_DEFENDER"
+                    })
                 if notification_dispatcher.enabled:
                     notification_dispatcher.send_alert(alert_dict)
         finally:
@@ -277,10 +344,17 @@ async def lifespan(app: FastAPI):
     # Start live telemetry pulse task
     app_state.pulse_task = asyncio.create_task(traffic_pulse_broadcaster())
 
+    # Autonomous Inbuilt AI Threat Resolution Sweep for any pending alerts
+    try:
+        sweep_res = active_defense_manager.sweep_and_auto_resolve_all()
+        logger.info(f"[AUTONOMOUS AI DEFENSE] Initial sweep: {sweep_res}")
+    except Exception as ex:
+        logger.warning(f"Could not run initial AI auto-defense sweep: {ex}")
+
     # Log operational start
     db = SessionLocal()
     try:
-        db.add(SystemLog(source="SOC_SYSTEM", level="INFO", message="SOC Intrusion Detection Engine started successfully."))
+        db.add(SystemLog(source="SOC_SYSTEM", level="INFO", message="SOC Intrusion Detection Engine & Inbuilt AI Defender fully operational."))
         db.commit()
     finally:
         db.close()

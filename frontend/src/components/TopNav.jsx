@@ -58,7 +58,7 @@ export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount =
           <Shield className="w-4 h-4 text-blue-400" />
         </div>
         <div className="flex-shrink-0">
-          <h1 className="text-sm sm:text-base font-black tracking-widest text-white uppercase font-cyber leading-none">
+          <h1 className="text-sm sm:text-base font-black tracking-wider text-white uppercase leading-none">
             CYBERSOC IDS
           </h1>
           <p className="text-[10px] text-cyan-400 font-medium tracking-wide mt-0.5">
@@ -96,6 +96,15 @@ export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount =
 
       {/* Right Status & Live Clock */}
       <div className="flex items-center space-x-2 sm:space-x-2.5 flex-shrink-0">
+        {/* AI Auto-Resolve Defense Badge */}
+        <div 
+          className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-cyan-950/70 border border-cyan-500/50 text-cyan-300 text-[11px] font-mono font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)] flex-shrink-0 whitespace-nowrap"
+          title="Inbuilt AI Engine autonomously quarantines and resolves threats in real time"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          <span>AI AUTO-RESOLVE ⚡</span>
+        </div>
+
         {/* REAL MONITORING Mode Indicator Badge */}
         <div 
           className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/50 text-emerald-400 text-[11px] font-mono font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)] flex-shrink-0 whitespace-nowrap"

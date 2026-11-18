@@ -111,6 +111,28 @@ export const toggleAutoBlock = async (enabled) => {
   return res.json();
 };
 
+export const fetchDefenseStatus = async () => {
+  const res = await fetch(`${API_BASE}/defense/status`);
+  if (!res.ok) throw new Error('Failed to fetch defense status');
+  return res.json();
+};
+
+export const triggerAiAutoResolveAll = async () => {
+  const res = await fetch(`${API_BASE}/defense/ai-auto-resolve-all`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to trigger AI auto-resolve');
+  return res.json();
+};
+
+export const toggleAiResolve = async (enabled) => {
+  const res = await fetch(`${API_BASE}/defense/toggle-ai-resolve?enabled=${enabled}`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to toggle AI resolve');
+  return res.json();
+};
+
 export const fetchIpIntel = async (ip) => {
   const res = await fetch(`${API_BASE}/intel/ip/${encodeURIComponent(ip)}`);
   if (!res.ok) throw new Error('Failed to fetch IP intelligence');

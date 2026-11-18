@@ -269,13 +269,22 @@ export default function GlobalThreatMap({ threatNodes = [], onMaximize }) {
             </button>
           </div>
           <div className="space-y-1.5">
-            {localThreats.slice(0, 4).map((lt) => (
-              <div key={lt.id} className="flex items-center justify-between text-[10px] py-0.5 border-b border-slate-800/40 last:border-0">
-                <span className="text-cyan-300 font-bold truncate max-w-[130px]" title={lt.ip}>{lt.ip}</span>
-                <span className="text-red-400 font-semibold">{lt.category}</span>
-                <span className="text-slate-400">({lt.type})</span>
-              </div>
-            ))}
+            {localThreats.slice(0, 4).map((lt) => {
+              const displayIp = lt.ip.length > 18 ? `${lt.ip.slice(0, 9)}...${lt.ip.slice(-4)}` : lt.ip;
+              return (
+                <div key={lt.id} className="flex items-center justify-between text-[10px] py-0.5 border-b border-slate-800/40 last:border-0 gap-2">
+                  <span className="text-cyan-300 font-bold font-mono truncate max-w-[120px]" title={lt.ip}>
+                    {displayIp}
+                  </span>
+                  <span className="text-red-400 font-semibold shrink-0 font-mono">
+                    {lt.category}
+                  </span>
+                  <span className="text-slate-400 shrink-0 font-mono">
+                    ({lt.type})
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

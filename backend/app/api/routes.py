@@ -718,6 +718,44 @@ def unblock_attacker_ip(payload: UnblockIpRequest):
     return active_defense_manager.unblock_ip(payload.ip)
 
 
+@router.get("/defense/status")
+def get_defense_status(db: Session = Depends(get_db)):
+    """Retrieve autonomous AI defense engine health, active policies, and mitigation metrics."""
+    open_alerts = db.query(ThreatAlert).filter(ThreatAlert.status == "OPEN").count()
+    resolved_alerts = db.query(ThreatAlert).filter(ThreatAlert.status.in_(["RESOLVED", "RESOLVED_BY_AI"])).count()
+    total_threats = db.query(ThreatAlert).count()
+    quarantined_ips = len(active_defense_manager.blocked_ips)
+    
+    return {
+        "ai_auto_resolve_enabled": active_defense_manager.ai_auto_resolve_enabled,
+        "auto_block_enabled": active_defense_manager.auto_block_enabled,
+        "default_duration_seconds": active_defense_manager.default_block_duration,
+        "open_threats": open_alerts,
+        "resolved_threats": resolved_alerts,
+        "total_threats": total_threats,
+        "active_quarantined_ips": quarantined_ips,
+        "mitigation_mode": "AUTONOMOUS_REALTIME_AI",
+        "resolution_rate": f"{(resolved_alerts / max(1, total_threats) * 100):.1f}%"
+    }
+
+
+@router.post("/defense/ai-auto-resolve-all")
+def trigger_ai_auto_resolve_all():
+    """Trigger immediate Inbuilt AI Autonomous Resolution sweep across all pending threat alerts."""
+    res = active_defense_manager.sweep_and_auto_resolve_all()
+    return res
+
+
+@router.post("/defense/toggle-ai-resolve")
+def toggle_ai_resolve(enabled: bool = Query(...)):
+    """Toggle real-time autonomous AI threat resolution mode."""
+    active_defense_manager.ai_auto_resolve_enabled = enabled
+    return {
+        "status": "UPDATED",
+        "ai_auto_resolve_enabled": active_defense_manager.ai_auto_resolve_enabled
+    }
+
+
 @router.post("/defense/toggle-auto-block")
 def toggle_auto_block(enabled: bool = Query(...)):
     """Toggle automated firewall isolation for high-confidence threats."""
