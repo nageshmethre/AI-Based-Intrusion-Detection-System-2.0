@@ -291,7 +291,7 @@ export default function GlobalThreatMap({ threatNodes = [], onMaximize }) {
                 onClick={() => setShowLocalOverlay(!showLocalOverlay)}
                 className="ml-2 text-amber-400 font-semibold hover:underline cursor-pointer bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30"
               >
-                {showLocalOverlay ? 'Hide Local Detections [X]' : `(${localThreats.length} Local Detections • View)`}
+                {showLocalOverlay ? 'Hide Local' : `(${localThreats.length} Local Detections)`}
               </button>
             )}
           </span>

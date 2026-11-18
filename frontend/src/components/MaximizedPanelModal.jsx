@@ -129,22 +129,14 @@ export default function MaximizedPanelModal({
             </div>
           </div>
 
-          {/* Action Buttons & Close 'X' Button */}
-          <div className="flex items-center space-x-3">
-            <span className="text-[11px] font-mono text-slate-400 hidden sm:inline-block">
-              Press <kbd className="px-1.5 py-0.5 bg-slate-800 text-slate-200 rounded border border-slate-700 text-[10px]">ESC</kbd> or click:
-            </span>
-
-            {/* Prominent Red Minimizing 'X' Button */}
-            <button
-              onClick={onClose}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500 rounded-lg text-xs font-mono font-bold transition-all shadow-[0_0_12px_rgba(244,63,94,0.3)] group cursor-pointer"
-              title="Minimize & Close (Esc)"
-            >
-              <X className="w-4 h-4 group-hover:rotate-90 transition-transform duration-200" />
-              <span>MINIMIZE [X]</span>
-            </button>
-          </div>
+          {/* Normal 'X' Close/Minimize Button */}
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/50 hover:border-rose-400 transition-colors cursor-pointer"
+            title="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Modal Body / Enlarged Content */}
@@ -656,9 +648,10 @@ export default function MaximizedPanelModal({
           </div>
           <button
             onClick={onClose}
-            className="text-cyan-400 hover:text-cyan-300 underline font-bold"
+            className="p-1 rounded hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+            title="Close"
           >
-            Click here or press ESC to minimize
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
