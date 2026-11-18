@@ -1,49 +1,63 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Shield, RefreshCw } from 'lucide-react';
+import { Terminal } from 'lucide-react';
+import { fetchSystemLogs } from '../services/api';
 
-export default function LiveTerminal({ liveEvents = [], liveAlerts = [], currentInterface = 'Intel(R) Wi-Fi 6 AX201' }) {
+export default function LiveTerminal({ liveEvents = [], liveAlerts = [], currentInterface = 'Default' }) {
   const [logs, setLogs] = useState([]);
   const containerRef = useRef(null);
 
-  // Initialize baseline logs
+  // Load genuine system logs from database on mount
   useEffect(() => {
-    const now = new Date();
-    const time = now.toTimeString().split(' ')[0];
-    const initialLogs = [
-      { id: 1, text: `> [${time}] Capturing packets on: ${currentInterface || 'Intel(R) Wi-Fi 6 AX201'}...`, type: 'INFO' },
-      { id: 2, text: `> [${time}] Flow aggregated: 172.20.10.2 -> 127.0.0.1`, type: 'FLOW' },
-      { id: 3, text: `> [${time}] [RULE] PortScan check: 14 unique ports monitored`, type: 'RULE' },
-      { id: 4, text: `> [${time}] [ALERT] Port Scanning Activity Detected!`, type: 'ALERT' },
-      { id: 5, text: `> [${time}] [ML] Prediction: BENIGN (0.98)`, type: 'BENIGN' },
-      { id: 6, text: `> [${time}] [ML] Prediction: DoS (0.81)`, type: 'ATTACK' },
-      { id: 7, text: `> [${time}] Alert stored in SQLite (ID: 509)`, type: 'DB' }
-    ];
-    setLogs(initialLogs);
+    fetchSystemLogs(30)
+      .then((records) => {
+        if (records && records.length > 0) {
+          const formatted = records.reverse().map((r) => {
+            const time = r.timestamp ? r.timestamp.split('T')[1]?.slice(0, 8) : '--:--:--';
+            return {
+              id: r.id || Math.random(),
+              text: `> [${time}] [${r.source || 'SYSTEM'}] ${r.message}`,
+              type: r.level || 'INFO'
+            };
+          });
+          setLogs(formatted);
+        } else {
+          const nowStr = new Date().toTimeString().split(' ')[0];
+          setLogs([
+            { id: 1, text: `> [${nowStr}] [INITIALIZE] Sniffer active on interface: ${currentInterface}`, type: 'INFO' },
+            { id: 2, text: `> [${nowStr}] [MONITOR] Real-time packet inspection active. Awaiting traffic...`, type: 'INFO' }
+          ]);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load initial system logs', err);
+      });
   }, [currentInterface]);
 
-  // Append incoming live alerts
+  // Append genuine incoming live alerts from WebSocket
   useEffect(() => {
     if (!liveAlerts || liveAlerts.length === 0) return;
     const alert = liveAlerts[0];
-    const time = new Date().toTimeString().split(' ')[0];
+    const time = alert.timestamp ? alert.timestamp.split('T')[1]?.slice(0, 8) : new Date().toTimeString().split(' ')[0];
+    const confPct = ((alert.confidence || 0.95) * 100).toFixed(0);
     const newLog = {
       id: Date.now() + Math.random(),
-      text: `> [${time}] [${alert.detection_type || 'ALERT'}] ${alert.threat_category || 'Threat'} from ${alert.src_ip} (Conf: ${((alert.confidence || 0.95)*100).toFixed(0)}%)`,
+      text: `> [${time}] [ALERT] [${alert.detection_type || 'RULE'}] ${alert.threat_category || 'Threat'} from ${alert.src_ip} -> ${alert.dst_ip}:${alert.dst_port || 0} (${confPct}% Conf)`,
       type: 'ALERT'
     };
     setLogs((prev) => [...prev.slice(-40), newLog]);
   }, [liveAlerts]);
 
-  // Append incoming live events
+  // Append genuine incoming live network flows from WebSocket
   useEffect(() => {
     if (!liveEvents || liveEvents.length === 0) return;
     const ev = liveEvents[0];
-    const time = new Date().toTimeString().split(' ')[0];
-    const isMalicious = ev.is_malicious || ev.prediction !== 'BENIGN';
+    const time = ev.timestamp ? ev.timestamp.split('T')[1]?.slice(0, 8) : new Date().toTimeString().split(' ')[0];
+    const isThreat = ev.is_malicious || ev.prediction !== 'BENIGN';
+    const confPct = ((ev.confidence || 0.9) * 100).toFixed(0);
     const newLog = {
       id: Date.now() + Math.random(),
-      text: `> [${time}] [ML] Flow ${ev.src_ip}:${ev.src_port || 0} -> ${ev.dst_ip}:${ev.dst_port || 0} | ${ev.prediction || 'BENIGN'} (${((ev.confidence || 0.9)*100).toFixed(0)}%)`,
-      type: isMalicious ? 'ATTACK' : 'BENIGN'
+      text: `> [${time}] [FLOW] ${ev.protocol || 'TCP'} ${ev.src_ip}:${ev.src_port || 0} -> ${ev.dst_ip}:${ev.dst_port || 0} | ${ev.prediction || 'BENIGN'} (${confPct}%)`,
+      type: isThreat ? 'ATTACK' : 'BENIGN'
     };
     setLogs((prev) => [...prev.slice(-40), newLog]);
   }, [liveEvents]);
@@ -79,12 +93,17 @@ export default function LiveTerminal({ liveEvents = [], liveAlerts = [], current
       >
         {logs.map((log) => {
           let colorClass = 'text-slate-300';
-          if (log.type === 'ALERT') colorClass = 'text-red-400 font-bold bg-red-950/30 px-1 rounded';
-          else if (log.type === 'ATTACK') colorClass = 'text-orange-400 font-bold';
-          else if (log.type === 'BENIGN') colorClass = 'text-emerald-400';
-          else if (log.type === 'RULE') colorClass = 'text-amber-300';
-          else if (log.type === 'DB') colorClass = 'text-cyan-400';
-          else if (log.type === 'INFO') colorClass = 'text-blue-300';
+          if (log.type === 'ALERT' || log.type === 'CRITICAL') {
+            colorClass = 'text-red-400 font-bold bg-red-950/30 px-1 rounded';
+          } else if (log.type === 'ATTACK' || log.type === 'WARNING') {
+            colorClass = 'text-orange-400 font-bold';
+          } else if (log.type === 'BENIGN') {
+            colorClass = 'text-emerald-400';
+          } else if (log.type === 'RULE') {
+            colorClass = 'text-amber-300';
+          } else if (log.type === 'INFO') {
+            colorClass = 'text-cyan-300';
+          }
 
           return (
             <div key={log.id} className={`${colorClass} hover:bg-slate-900/40 px-1 rounded transition-colors`}>

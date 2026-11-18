@@ -1,68 +1,54 @@
 import React, { useMemo } from 'react';
 import { WORLD_MAP_PATH } from './worldMapPath';
-import { Activity } from 'lucide-react';
+import { Activity, ShieldCheck, AlertTriangle, Network } from 'lucide-react';
 
 export default function GlobalThreatMap({ threatNodes = [] }) {
   // Destination Target: "Your System (Host)" - Indian Subcontinent (New Delhi / Bangalore region)
   // Formula: lon 77.2 -> x 714, lat 28.6 -> y 171
   const targetCoord = { x: 714, y: 171, label: 'Your System (Host)' };
 
-  // Pre-calibrated global threat sectors matching enterprise cybersecurity command centers
-  const defaultGlobalSectors = [
-    { id: 1, x: 286, y: 142, ip: '198.51.100.24', city: 'Ashburn, US', sev: 'HIGH', cat: 'DoS' },
-    { id: 2, x: 524, y: 111, ip: '185.199.108.153', city: 'Frankfurt, DE', sev: 'MEDIUM', cat: 'BruteForce' },
-    { id: 3, x: 888, y: 151, ip: '203.0.113.88', city: 'Tokyo, JP', sev: 'HIGH', cat: 'PortScan' },
-    { id: 4, x: 370, y: 315, ip: '177.136.242.12', city: 'Sao Paulo, BR', sev: 'CRITICAL', cat: 'Botnet' },
-    { id: 5, x: 604, y: 95, ip: '91.240.118.50', city: 'Moscow, RU', sev: 'HIGH', cat: 'DoS' }
-  ];
+  // Separate genuine public geolocated threats from internal / private subnet traffic
+  const { publicThreats, localThreats } = useMemo(() => {
+    const publicList = [];
+    const localList = [];
 
-  // Map real threat telemetry to geographical nodes, ensuring no node overlaps with the host
-  const sources = useMemo(() => {
-    if (!threatNodes || threatNodes.length === 0) {
-      return defaultGlobalSectors;
-    }
+    (threatNodes || []).forEach((node, idx) => {
+      const ip = node.ip || '';
+      const isPrivateOrLoopback = 
+        ip === '127.0.0.1' || 
+        ip === '::1' || 
+        ip.startsWith('192.168.') || 
+        ip.startsWith('10.') || 
+        ip.startsWith('172.16.') || 
+        ip.startsWith('172.20.') || 
+        ip.startsWith('fe80:') ||
+        ip.startsWith('2409:');
 
-    // Assign threat nodes to distinct global vantage points
-    return threatNodes.slice(0, 5).map((node, idx) => {
-      let x, y;
-      const isLocalOrPrivate = 
-        !node.lat || !node.lon || 
-        node.ip === '127.0.0.1' || 
-        node.ip?.startsWith('192.168.') || 
-        node.ip?.startsWith('10.') || 
-        node.ip?.startsWith('172.') ||
-        node.ip?.startsWith('2409:');
-
-      if (isLocalOrPrivate) {
-        // Map local test vectors to a default global threat ingress sector
-        const fallbackSector = defaultGlobalSectors[idx % defaultGlobalSectors.length];
-        x = fallbackSector.x;
-        y = fallbackSector.y;
-      } else {
-        // Standard Equirectangular projection
-        x = Math.round(((node.lon + 180.0) / 360.0) * 1000.0);
-        y = Math.round(((90.0 - node.lat) / 180.0) * 500.0);
-        
-        // Prevent stacking right on host (within 40px radius)
-        if (Math.abs(x - targetCoord.x) < 45 && Math.abs(y - targetCoord.y) < 45) {
-          x = defaultGlobalSectors[idx % defaultGlobalSectors.length].x;
-          y = defaultGlobalSectors[idx % defaultGlobalSectors.length].y;
-        }
+      if (isPrivateOrLoopback) {
+        localList.push({
+          id: idx,
+          ip: ip,
+          category: node.category || 'Threat',
+          severity: node.severity || 'HIGH',
+          type: ip === '127.0.0.1' ? 'LOOPBACK' : 'INTERNAL_LAN'
+        });
+      } else if (node.lat && node.lon) {
+        // Genuine public geolocated IP
+        const x = Math.round(((node.lon + 180.0) / 360.0) * 1000.0);
+        const y = Math.round(((90.0 - node.lat) / 180.0) * 500.0);
+        publicList.push({
+          id: idx,
+          x: Math.max(60, Math.min(940, x)),
+          y: Math.max(50, Math.min(450, y)),
+          ip: ip,
+          city: `${node.city || 'Unknown City'}, ${node.country || 'Public Host'}`,
+          sev: node.severity || 'HIGH',
+          cat: node.category || 'Threat'
+        });
       }
-
-      x = Math.max(60, Math.min(940, x));
-      y = Math.max(50, Math.min(450, y));
-
-      return {
-        id: idx,
-        x,
-        y,
-        ip: node.ip || '198.51.100.23',
-        city: `${node.city || 'Remote Node'}, ${node.country || 'External'}`,
-        sev: node.severity || 'HIGH',
-        cat: node.category || 'Threat'
-      };
     });
+
+    return { publicThreats: publicList, localThreats: localList };
   }, [threatNodes]);
 
   return (
@@ -84,7 +70,7 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
           </div>
           <div className="flex items-center space-x-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border border-red-300 shadow-[0_0_8px_#ef4444]"></span>
-            <span className="text-white font-semibold">Attack Source</span>
+            <span className="text-white font-semibold">Public Attack Source</span>
           </div>
           <div className="flex items-center space-x-1.5">
             <span className="w-3.5 h-0.5 bg-red-500 rounded"></span>
@@ -97,7 +83,6 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <svg viewBox="0 0 1000 500" className="w-full h-full">
           <defs>
-            {/* High-Tech Glowing Filter */}
             <filter id="mapGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge>
@@ -106,12 +91,10 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
               </feMerge>
             </filter>
 
-            {/* Matrix Dot Pattern Fill for Continents */}
             <pattern id="continentDotMatrix" width="7" height="7" patternUnits="userSpaceOnUse">
-              <circle cx="3.5" cy="3.5" r="1.1" fill="#38bdf8" opacity="0.38" />
+              <circle cx="3.5" cy="3.5" r="1.1" fill="#38bdf8" opacity="0.35" />
             </pattern>
 
-            {/* Attack Beam Gradient */}
             <linearGradient id="attackBeamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" />
               <stop offset="70%" stopColor="#f87171" stopOpacity="0.8" />
@@ -121,21 +104,17 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
 
           {/* Precision Coordinate Latitude & Longitude Grid Lines */}
           <g stroke="#09182d" strokeWidth="0.6" strokeDasharray="3 4">
-            {/* Longitude Meridians */}
             {[100, 200, 300, 400, 500, 600, 700, 800, 900].map((x) => (
               <line key={x} x1={x} y1="0" x2={x} y2="500" />
             ))}
-            {/* Latitude Parallels */}
             {[70, 140, 210, 280, 350, 420].map((y) => (
               <line key={y} x1="0" y1={y} x2="1000" y2={y} />
             ))}
-            {/* Equator */}
             <line x1="0" y1="250" x2="1000" y2="250" stroke="#0e2a4f" strokeWidth="1" strokeDasharray="4 2" />
           </g>
 
           {/* Authentic Real-World Continent Landmasses */}
           <g>
-            {/* 1. Base Landmass Silhouette Fill */}
             <path
               d={WORLD_MAP_PATH}
               fill="#08152b"
@@ -143,20 +122,18 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
               strokeWidth="0.75"
               strokeLinejoin="round"
             />
-            {/* 2. Cyber Matrix Dot Overlay Fill */}
             <path
               d={WORLD_MAP_PATH}
               fill="url(#continentDotMatrix)"
               stroke="#0284c7"
               strokeWidth="0.65"
-              strokeOpacity="0.5"
+              strokeOpacity="0.45"
               strokeLinejoin="round"
             />
           </g>
 
-          {/* Dynamic Animated Attack Arcs & Shockwaves */}
-          {sources.map((src) => {
-            // Elevated parabolic curve
+          {/* Genuine Public Attack Nodes and Beams */}
+          {publicThreats.map((src) => {
             const midX = (src.x + targetCoord.x) / 2;
             const dist = Math.abs(src.x - targetCoord.x);
             const elevation = Math.min(100, Math.max(45, dist * 0.22));
@@ -165,7 +142,6 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
 
             return (
               <g key={src.id}>
-                {/* Background Shadow Arc */}
                 <path
                   d={arcPath}
                   fill="none"
@@ -174,8 +150,6 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
                   strokeOpacity="0.3"
                   strokeDasharray="4 4"
                 />
-
-                {/* Animated Flowing Laser Pulse */}
                 <path
                   d={arcPath}
                   fill="none"
@@ -193,15 +167,11 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
                     repeatCount="indefinite"
                   />
                 </path>
-
-                {/* Attacker Pulsing Beacon */}
                 <circle cx={src.x} cy={src.y} r="4" fill="#ef4444" filter="url(#mapGlow)" />
                 <circle cx={src.x} cy={src.y} r="8" fill="none" stroke="#ef4444" strokeWidth="1.2">
                   <animate attributeName="r" values="4;15;4" dur="2.2s" repeatCount="indefinite" />
                   <animate attributeName="opacity" values="0.9;0;0.9" dur="2.2s" repeatCount="indefinite" />
                 </circle>
-
-                {/* Floating IP Badge */}
                 <g transform={`translate(${src.x}, ${src.y - 12})`}>
                   <rect
                     x="-42"
@@ -212,7 +182,7 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
                     fill="#050a16"
                     stroke="#ef4444"
                     strokeWidth="0.6"
-                    opacity="0.88"
+                    opacity="0.9"
                   />
                   <text
                     x="0"
@@ -239,7 +209,6 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
             </circle>
             <circle cx={targetCoord.x} cy={targetCoord.y} r="30" fill="none" stroke="#0284c7" strokeWidth="0.8" strokeDasharray="3 3" />
             
-            {/* Host Tooltip Label */}
             <g transform={`translate(${targetCoord.x}, ${targetCoord.y + 20})`}>
               <rect
                 x="-46"
@@ -268,11 +237,35 @@ export default function GlobalThreatMap({ threatNodes = [] }) {
         </svg>
       </div>
 
+      {/* Internal Subnet / Loopback Activity Overlay Badge */}
+      {localThreats.length > 0 && (
+        <div className="absolute top-14 left-4 z-20 max-w-xs bg-[#030712]/90 border border-amber-500/40 rounded-lg p-2.5 font-mono text-[10px] text-slate-300 shadow-xl backdrop-blur">
+          <div className="flex items-center space-x-1.5 text-amber-400 font-bold uppercase mb-1">
+            <Network className="w-3.5 h-3.5" />
+            <span>Local Subnet / Host Threat Activity</span>
+          </div>
+          <div className="space-y-1">
+            {localThreats.slice(0, 3).map((lt) => (
+              <div key={lt.id} className="flex items-center justify-between text-[10px]">
+                <span className="text-cyan-300 font-bold">{lt.ip}</span>
+                <span className="text-red-400 font-semibold">{lt.category}</span>
+                <span className="text-slate-400">({lt.type})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Bottom Live Threat Summary Footer */}
       <div className="z-10 flex items-center justify-between text-[11px] font-mono text-slate-300 bg-[#060D1E]/90 px-3 py-1.5 rounded-lg border border-cyan-950 backdrop-blur shadow-sm">
         <div className="flex items-center space-x-2">
           <Activity className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Active Threat Arcs: <strong className="text-white">{sources.length} Detected Vectors</strong></span>
+          <span>
+            External Public Vectors: <strong className="text-white">{publicThreats.length} Active</strong>
+            {localThreats.length > 0 && (
+              <span className="ml-2 text-amber-400 font-semibold">({localThreats.length} Local Detections)</span>
+            )}
+          </span>
         </div>
         <div className="text-slate-400">
           Target Interface: <span className="text-cyan-400 font-bold">127.0.0.1 / Physical Adapter</span>

@@ -10,7 +10,10 @@ from sqlalchemy import func, desc
 from pydantic import BaseModel
 
 from backend.app.database.connection import get_db, SessionLocal
-from backend.app.database.models import NetworkEvent, ThreatAlert, SystemLog
+from backend.app.database.models import (
+    NetworkEvent, ThreatAlert, SystemLog,
+    DefensiveAction, ScanHistory, DiscoveredHost
+)
 from backend.app.config import settings
 from backend.app.ml.train import train_model
 from backend.app.ml.dataset_importer import scan_raw_dataset_files, process_authentic_cicids2017
@@ -21,6 +24,7 @@ from backend.app.ml.explainer import explain_flow_prediction
 from backend.app.reports.exporter import generate_executive_html_report
 from backend.app.notifications.webhook import notification_dispatcher
 from backend.app.scanner.web_scanner import audit_website
+from backend.app.scanner.network_scanner import network_scanner
 from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/api")
@@ -52,6 +56,18 @@ class BlockIpRequest(BaseModel):
     reason: Optional[str] = "Manual isolation by SOC analyst"
     duration_seconds: Optional[int] = 300
     threat_category: Optional[str] = "Attack"
+    dry_run: Optional[bool] = False
+
+
+class HostDiscoveryRequest(BaseModel):
+    target_subnet: str = "127.0.0.1/32"
+    max_threads: Optional[int] = 20
+
+
+class PortScanRequest(BaseModel):
+    target_ip: str
+    ports: Optional[List[int]] = None
+    max_threads: Optional[int] = 15
 
 
 class UnblockIpRequest(BaseModel):
@@ -688,8 +704,11 @@ def block_attacker_ip(payload: BlockIpRequest):
         ip=payload.ip,
         reason=payload.reason or "Manual block by SOC operator",
         duration_seconds=payload.duration_seconds,
-        threat_category=payload.threat_category or "Threat"
+        threat_category=payload.threat_category or "Threat",
+        dry_run=payload.dry_run or False
     )
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("message", "IP block action rejected"))
     return res
 
 
@@ -707,6 +726,108 @@ def toggle_auto_block(enabled: bool = Query(...)):
         "status": "UPDATED",
         "auto_block_enabled": active_defense_manager.auto_block_enabled
     }
+
+
+@router.get("/defense/actions-history")
+def get_defense_actions_history(limit: int = 50, db: Session = Depends(get_db)):
+    """Retrieve full audit history of all defensive firewall actions (blocks and unblocks)."""
+    actions = db.query(DefensiveAction).order_by(desc(DefensiveAction.timestamp)).limit(limit).all()
+    return [
+        {
+            "id": a.id,
+            "timestamp": a.timestamp.isoformat(),
+            "ip": a.ip,
+            "action": a.action,
+            "rule_name": a.rule_name,
+            "threat_category": a.threat_category,
+            "reason": a.reason,
+            "duration_seconds": a.duration_seconds,
+            "is_active": a.is_active,
+            "firewall_success": a.firewall_success,
+            "admin_user": a.admin_user,
+            "unblocked_at": a.unblocked_at.isoformat() if a.unblocked_at else None
+        }
+        for a in actions
+    ]
+
+
+@router.post("/defense/emergency-unblock-all")
+def emergency_unblock_all():
+    """Emergency response: flush and remove all active CyberSOC firewall blocking rules."""
+    return active_defense_manager.unblock_all_emergency()
+
+
+# ==========================================
+# 2. Authorized Network Scanner Endpoints
+# ==========================================
+
+@router.post("/network-scan/host-discovery")
+def run_host_discovery(payload: HostDiscoveryRequest):
+    """Perform real active host discovery on authorized subnet."""
+    try:
+        res = network_scanner.discover_subnet_hosts(
+            target_subnet=payload.target_subnet,
+            max_threads=payload.max_threads or 20
+        )
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"Discovery failed: {str(ex)}")
+
+
+@router.post("/network-scan/port-scan")
+def run_port_scan(payload: PortScanRequest):
+    """Perform real TCP connect port scan and service banner grabbing against authorized target."""
+    try:
+        res = network_scanner.scan_target_ports(
+            target_ip=payload.target_ip,
+            ports=payload.ports,
+            max_threads=payload.max_threads or 15
+        )
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"Port scan failed: {str(ex)}")
+
+
+@router.get("/network-scan/history")
+def get_scan_history(limit: int = 30, db: Session = Depends(get_db)):
+    """Retrieve history of completed network and port scans."""
+    scans = db.query(ScanHistory).order_by(desc(ScanHistory.timestamp)).limit(limit).all()
+    return [
+        {
+            "id": s.id,
+            "timestamp": s.timestamp.isoformat(),
+            "target": s.target,
+            "scan_type": s.scan_type,
+            "hosts_found": s.hosts_found,
+            "open_ports_count": s.open_ports_count,
+            "status": s.status,
+            "summary": s.summary_json
+        }
+        for s in scans
+    ]
+
+
+@router.get("/network-scan/hosts")
+def get_discovered_hosts(limit: int = 50, db: Session = Depends(get_db)):
+    """Retrieve discovered host inventory with open ports."""
+    hosts = db.query(DiscoveredHost).order_by(desc(DiscoveredHost.timestamp)).limit(limit).all()
+    return [
+        {
+            "id": h.id,
+            "timestamp": h.timestamp.isoformat(),
+            "ip": h.ip,
+            "mac": h.mac,
+            "hostname": h.hostname,
+            "is_alive": h.is_alive,
+            "latency_ms": h.latency_ms,
+            "open_ports": h.open_ports_json or []
+        }
+        for h in hosts
+    ]
 
 
 # ==========================================

@@ -4,6 +4,7 @@ import HackerSidebar from './components/HackerSidebar';
 import SecurityOverview from './pages/SecurityOverview';
 import LiveMonitoring from './pages/LiveMonitoring';
 import ThreatDetection from './pages/ThreatDetection';
+import NetworkScanner from './pages/NetworkScanner';
 import WebAttackScanner from './pages/WebAttackScanner';
 import ModelPerformance from './pages/ModelPerformance';
 import SecurityLogs from './pages/SecurityLogs';
@@ -21,12 +22,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [wsStatus, setWsStatus] = useState('CONNECTING');
   const [pulseHistory, setPulseHistory] = useState([]);
-  const [currentPps, setCurrentPps] = useState(243);
-  const [activeFlows, setActiveFlows] = useState(13);
-  const [currentInterface, setCurrentInterface] = useState('Intel(R) Wi-Fi 6 AX201');
+  const [currentPps, setCurrentPps] = useState(0);
+  const [activeFlows, setActiveFlows] = useState(0);
+  const [currentInterface, setCurrentInterface] = useState('Detecting Interface...');
   const [liveEvents, setLiveEvents] = useState([]);
   const [liveAlerts, setLiveAlerts] = useState([]);
-  const [openAlertCount, setOpenAlertCount] = useState(505);
+  const [openAlertCount, setOpenAlertCount] = useState(0);
   const [toastAlert, setToastAlert] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
@@ -34,8 +35,8 @@ export default function App() {
   const [interfaces, setInterfaces] = useState([]);
   const [selectedInterfaceId, setSelectedInterfaceId] = useState('DEFAULT');
   const [snifferRunning, setSnifferRunning] = useState(true);
-  const [totalPackets, setTotalPackets] = useState(17385);
-  const [bandwidthMbps, setBandwidthMbps] = useState(9.42);
+  const [totalPackets, setTotalPackets] = useState(0);
+  const [bandwidthMbps, setBandwidthMbps] = useState(0.0);
   const [topSourceIps, setTopSourceIps] = useState([]);
   const [topDestPorts, setTopDestPorts] = useState([]);
 
@@ -167,6 +168,9 @@ export default function App() {
           )}
           {activeTab === 'threats' && (
             <ThreatDetection liveAlerts={liveAlerts} />
+          )}
+          {activeTab === 'network-scanner' && (
+            <NetworkScanner />
           )}
           {activeTab === 'web-scanner' && (
             <WebAttackScanner onNavigateToThreats={() => setActiveTab('threats')} />

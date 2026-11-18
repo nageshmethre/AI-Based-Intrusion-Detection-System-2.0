@@ -71,3 +71,50 @@ class SystemLog(Base):
     source = Column(String(50), default="SYSTEM")
     level = Column(String(20), default="INFO")
     message = Column(Text, nullable=False)
+
+
+class DefensiveAction(Base):
+    """Audit log of all Windows Defender Firewall defensive actions (blocks & unblocks)."""
+    __tablename__ = "defensive_actions"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    ip = Column(String(45), index=True, nullable=False)
+    action = Column(String(20), nullable=False)  # BLOCK, UNBLOCK, DRY_RUN
+    rule_name = Column(String(100), nullable=False)
+    threat_category = Column(String(50), default="General Attack")
+    reason = Column(Text, nullable=False)
+    duration_seconds = Column(Integer, default=300)
+    is_active = Column(Boolean, default=True)
+    firewall_success = Column(Boolean, default=False)
+    admin_user = Column(String(50), default="SOC_Analyst")
+    unblocked_at = Column(DateTime, nullable=True)
+
+
+class ScanHistory(Base):
+    """History of authorized network inventory and vulnerability port scans."""
+    __tablename__ = "scan_history"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    target = Column(String(100), nullable=False)
+    scan_type = Column(String(50), nullable=False)  # HOST_DISCOVERY, TCP_PORT_SCAN, SYN_SCAN
+    hosts_found = Column(Integer, default=0)
+    open_ports_count = Column(Integer, default=0)
+    status = Column(String(20), default="COMPLETED")
+    summary_json = Column(JSON, nullable=True)
+
+
+class DiscoveredHost(Base):
+    """Inventory of discovered local network hosts and their open ports."""
+    __tablename__ = "discovered_hosts"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    scan_id = Column(Integer, index=True, nullable=True)
+    ip = Column(String(45), index=True, nullable=False)
+    mac = Column(String(30), nullable=True)
+    hostname = Column(String(100), nullable=True)
+    is_alive = Column(Boolean, default=True)
+    latency_ms = Column(Float, default=0.0)
+    open_ports_json = Column(JSON, nullable=True)  # List of {port, service, banner, state}

@@ -25,7 +25,7 @@ class SSHAuthMonitor:
         # e.g.: "Failed password for root from 192.168.1.50 port 55432 ssh2"
         # or "Failed password for invalid user admin from 10.0.0.99 port 44321 ssh2"
         self.ssh_failed_pattern = re.compile(
-            r"Failed (?:password|publickey) for (?:invalid user )?(\S+) from (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
+            r"Failed (?:password|publickey) for (?:invalid user |user )?(\S+) from (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
         )
 
     def parse_log_line(self, log_line: str, timestamp: Optional[float] = None) -> Optional[Dict[str, Any]]:

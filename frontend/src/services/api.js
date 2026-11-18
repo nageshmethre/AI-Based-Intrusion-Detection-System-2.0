@@ -126,6 +126,56 @@ export const fetchAlertExplanation = async (alertId) => {
 export const getIncidentReportUrl = () => `${API_BASE}/reports/incident-summary`;
 export const getLogsDownloadUrl = () => `${API_BASE}/logs/download`;
 
+export const runHostDiscovery = async (targetSubnet, maxThreads = 20) => {
+  const res = await fetch(`${API_BASE}/network-scan/host-discovery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_subnet: targetSubnet, max_threads: maxThreads }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Host discovery failed');
+  }
+  return res.json();
+};
+
+export const runPortScan = async (targetIp, ports = null, maxThreads = 15) => {
+  const res = await fetch(`${API_BASE}/network-scan/port-scan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_ip: targetIp, ports, max_threads: maxThreads }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Port scan failed');
+  }
+  return res.json();
+};
+
+export const fetchScanHistory = async (limit = 30) => {
+  const res = await fetch(`${API_BASE}/network-scan/history?limit=${limit}`);
+  if (!res.ok) throw new Error('Failed to fetch scan history');
+  return res.json();
+};
+
+export const fetchDiscoveredHosts = async (limit = 50) => {
+  const res = await fetch(`${API_BASE}/network-scan/hosts?limit=${limit}`);
+  if (!res.ok) throw new Error('Failed to fetch discovered hosts');
+  return res.json();
+};
+
+export const fetchDefenseActionsHistory = async (limit = 50) => {
+  const res = await fetch(`${API_BASE}/defense/actions-history?limit=${limit}`);
+  if (!res.ok) throw new Error('Failed to fetch defense actions history');
+  return res.json();
+};
+
+export const triggerEmergencyUnblockAll = async () => {
+  const res = await fetch(`${API_BASE}/defense/emergency-unblock-all`, { method: 'POST' });
+  if (!res.ok) throw new Error('Emergency unblock failed');
+  return res.json();
+};
+
 export const runWebScan = async (targetUrl, checkExposures = true, testWaf = true) => {
   const res = await fetch(`${API_BASE}/scanner/audit`, {
     method: 'POST',

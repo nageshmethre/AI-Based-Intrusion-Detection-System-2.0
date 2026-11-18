@@ -12,13 +12,15 @@ import {
   Square, 
   Radio, 
   Network,
-  Database
+  Database,
+  Crosshair
 } from 'lucide-react';
 
 const navItems = [
   { id: 'overview', label: 'Security Overview', icon: ShieldCheck },
   { id: 'monitoring', label: 'Live Network Monitoring', icon: Activity },
   { id: 'threats', label: 'Threat Detection', icon: AlertTriangle, hasBadge: true },
+  { id: 'network-scanner', label: 'Network Inventory & Port Scan', icon: Crosshair },
   { id: 'web-scanner', label: 'Web Attack Scanner', icon: Globe },
   { id: 'ai-model', label: 'AI Model Performance', icon: Cpu },
   { id: 'logs', label: 'Security Logs', icon: FileText },
@@ -35,33 +37,16 @@ export default function HackerSidebar({
   onSelectInterface,
   snifferRunning = true,
   onToggleSniffer,
-  pps = 243,
-  bandwidthMbps = 9.42,
-  totalPackets = 17385,
+  pps = 0,
+  bandwidthMbps = 0.0,
+  totalPackets = 0,
   topSourceIps = [],
   topDestPorts = [],
   systemStatus = {}
 }) {
   const isLoopback = selectedInterface.toLowerCase().includes('loopback');
-
-  const defaultTopIps = [
-    { ip: '172.20.10.2', percentage: 34.8 },
-    { ip: '185.199.108.153', percentage: 12.4 },
-    { ip: '142.250.183.78', percentage: 9.7 },
-    { ip: '20.198.162.76', percentage: 6.1 },
-    { ip: '127.0.0.1', percentage: 5.8 }
-  ];
-
-  const defaultTopPorts = [
-    { label: '443 (HTTPS)', percentage: 46.2 },
-    { label: '53 (DNS)', percentage: 18.1 },
-    { label: '80 (HTTP)', percentage: 9.5 },
-    { label: '22 (SSH)', percentage: 5.1 },
-    { label: '3389 (RDP)', percentage: 2.8 }
-  ];
-
-  const displayIps = topSourceIps.length > 0 ? topSourceIps : defaultTopIps;
-  const displayPorts = topDestPorts.length > 0 ? topDestPorts : defaultTopPorts;
+  const displayIps = topSourceIps;
+  const displayPorts = topDestPorts;
 
   return (
     <aside className="w-72 bg-[#060A13] border-r border-cyan-900/30 flex flex-col h-full min-h-screen text-slate-200 select-none overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
@@ -240,20 +225,26 @@ export default function HackerSidebar({
             <span>TOP SOURCE IPs (Live)</span>
           </h4>
           <div className="space-y-2 text-[11px] font-mono">
-            {displayIps.map((item, idx) => (
-              <div key={idx} className="space-y-0.5">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="truncate max-w-[170px] text-cyan-300" title={item.ip}>{item.ip}</span>
-                  <span className="font-bold text-white">{item.percentage}%</span>
+            {displayIps.length > 0 ? (
+              displayIps.map((item, idx) => (
+                <div key={idx} className="space-y-0.5">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="truncate max-w-[170px] text-cyan-300" title={item.ip}>{item.ip}</span>
+                    <span className="font-bold text-white">{item.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                    <div
+                      className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(5, item.percentage))}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                  <div
-                    className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
-                    style={{ width: `${Math.min(100, Math.max(5, item.percentage))}%` }}
-                  ></div>
-                </div>
+              ))
+            ) : (
+              <div className="text-[10px] text-slate-500 py-1 italic">
+                Awaiting active source traffic...
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -265,20 +256,26 @@ export default function HackerSidebar({
             TOP DESTINATION PORTS
           </h4>
           <div className="space-y-2 text-[11px] font-mono">
-            {displayPorts.map((item, idx) => (
-              <div key={idx} className="space-y-0.5">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="text-slate-200">{item.label}</span>
-                  <span className="font-bold text-white">{item.percentage}%</span>
+            {displayPorts.length > 0 ? (
+              displayPorts.map((item, idx) => (
+                <div key={idx} className="space-y-0.5">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-200">{item.label}</span>
+                    <span className="font-bold text-white">{item.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(5, item.percentage))}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
-                    style={{ width: `${Math.min(100, Math.max(5, item.percentage))}%` }}
-                  ></div>
-                </div>
+              ))
+            ) : (
+              <div className="text-[10px] text-slate-500 py-1 italic">
+                Awaiting flow port statistics...
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

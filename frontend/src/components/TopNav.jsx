@@ -8,11 +8,21 @@ import {
   Database, 
   HelpCircle,
   Radio,
-  Clock
+  Clock,
+  Crosshair,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount = 0 }) {
-  const [currentTime, setCurrentTime] = useState('');
+  const [currentTime, setCurrentTime] = useState(() => {
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[now.getMonth()];
+    const year = now.getFullYear();
+    const timeStr = now.toTimeString().split(' ')[0];
+    return `${day} ${month} ${year} | ${timeStr}`;
+  });
 
   useEffect(() => {
     const updateTime = () => {
@@ -21,11 +31,10 @@ export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount =
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const month = months[now.getMonth()];
       const year = now.getFullYear();
-      const timeStr = now.toTimeString().split(' ')[0]; // HH:MM:SS
+      const timeStr = now.toTimeString().split(' ')[0];
       setCurrentTime(`${day} ${month} ${year} | ${timeStr}`);
     };
 
-    updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -33,9 +42,9 @@ export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount =
   const navItems = [
     { id: 'overview', label: 'Live Monitor', icon: Activity },
     { id: 'threats', label: 'Threats', icon: Shield, badge: alertCount },
+    { id: 'network-scanner', label: 'Scanner', icon: Crosshair },
     { id: 'ai-model', label: 'AI Model', icon: Cpu },
     { id: 'logs', label: 'Logs', icon: FileText },
-    { id: 'guide', label: 'Dataset', icon: Database },
     { id: 'guide', label: 'Guide & Help', icon: HelpCircle },
   ];
 
@@ -84,17 +93,20 @@ export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount =
       </nav>
 
       {/* Right Status & Live Clock */}
-      <div className="flex items-center space-x-4">
-        {/* LIVE OPS Badge */}
-        <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+      <div className="flex items-center space-x-3 sm:space-x-4">
+        {/* REAL MONITORING Mode Indicator Badge */}
+        <div 
+          className="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/50 text-emerald-400 text-xs font-mono font-bold shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+          title="Mode: Real Network Sniffing & Live AI Inspection Active"
+        >
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block"></span>
-          <span>LIVE OPS</span>
+          <span className="tracking-wider">REAL MONITORING</span>
         </div>
 
         {/* Live Clock */}
         <div className="hidden lg:flex items-center text-xs font-mono text-slate-300 tracking-wider">
           <Clock className="w-3.5 h-3.5 text-cyan-400 mr-2" />
-          <span>{currentTime || '18 Nov 2026 | 00:35:34'}</span>
+          <span>{currentTime}</span>
         </div>
       </div>
     </header>

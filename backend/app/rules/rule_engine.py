@@ -6,6 +6,7 @@ from backend.app.config import settings
 from backend.app.rules.port_scan import PortScanDetector
 from backend.app.rules.abnormal_conn import AbnormalConnectionDetector
 from backend.app.rules.ssh_monitor import SSHAuthMonitor
+from backend.app.rules.advanced_rules import AdvancedRuleEngine
 
 logger = logging.getLogger("RuleEngine")
 
@@ -26,6 +27,7 @@ class RuleBasedDetectionEngine:
             failure_threshold=settings.SSH_FAILURE_THRESHOLD,
             window_seconds=60.0
         )
+        self.advanced_rules = AdvancedRuleEngine()
 
     def evaluate_packet(self, packet_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Evaluate raw packet against packet-level rules."""
@@ -46,6 +48,21 @@ class RuleBasedDetectionEngine:
         syn_alert = self.abnormal_conn_detector.process_packet(src_ip, dst_ip, dst_port, protocol, tcp_flags)
         if syn_alert:
             alerts.append(syn_alert)
+
+        # 3. Stealth scan check (NULL, XMAS, SYN-FIN)
+        stealth_alert = self.advanced_rules.check_stealth_scan(src_ip, dst_ip, dst_port, protocol, tcp_flags)
+        if stealth_alert:
+            alerts.append(stealth_alert)
+
+        # 4. Distributed DDoS traffic pattern
+        ddos_alert = self.advanced_rules.check_ddos_distributed(src_ip, dst_ip, dst_port)
+        if ddos_alert:
+            alerts.append(ddos_alert)
+
+        # 5. Botnet periodic beaconing
+        beacon_alert = self.advanced_rules.check_botnet_beaconing(src_ip, dst_ip, dst_port)
+        if beacon_alert:
+            alerts.append(beacon_alert)
 
         return alerts
 

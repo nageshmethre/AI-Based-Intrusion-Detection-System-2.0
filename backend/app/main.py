@@ -168,7 +168,7 @@ def handle_live_packet(packet_dict: dict):
                     dst_port=ra.get("dst_port"),
                     protocol=ra.get("protocol"),
                     detection_type=ra["detection_type"],
-                    threat_category="PortScan" if "PORT" in ra["rule_name"] else "DoS",
+                    threat_category=ra.get("threat_category", "PortScan" if "PORT" in ra["rule_name"] else "DoS"),
                     severity=ra["severity"],
                     confidence=1.0,
                     status="OPEN",
