@@ -186,7 +186,7 @@ export default function SecurityOverview({
         (e.prediction && e.prediction.toLowerCase().includes(term))
       );
     }
-    return list.slice(0, 12);
+    return list.slice(0, 18);
   }, [liveEvents, data, protocolFilter, predictionFilter, searchTerm]);
 
   // Filtered recent alerts for the alerts table
@@ -200,7 +200,7 @@ export default function SecurityOverview({
         (a.detection_method && a.detection_method.toLowerCase().includes(term))
       );
     }
-    return list.slice(0, 6);
+    return list.slice(0, 10);
   }, [alertsList, searchTerm]);
 
   const displayIps = topSourceIps.length > 0 ? topSourceIps : (data?.top_source_ips || []);
@@ -379,12 +379,12 @@ export default function SecurityOverview({
         </div>
       ) : (
         /* Symmetrical 3-Column SOC Defender Command Center matching Reference Image */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
           
           {/* ========================================================= */}
           {/* COLUMN 1 (LEFT, 3 cols): System Status, NIC, Top IPs & Ports */}
           {/* ========================================================= */}
-          <div className="lg:col-span-3 space-y-3">
+          <div className="lg:col-span-3 space-y-3 flex flex-col justify-between">
             {/* Box 1: SYSTEM STATUS */}
             <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md space-y-2">
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
@@ -608,7 +608,7 @@ export default function SecurityOverview({
           {/* ========================================================= */}
           {/* COLUMN 2 (CENTER, 5 cols): Map, KPI Strip, Event Stream    */}
           {/* ========================================================= */}
-          <div className="lg:col-span-5 space-y-3">
+          <div className="lg:col-span-5 space-y-3 flex flex-col justify-between">
             {/* Global Threat Map */}
             <div>
               <GlobalThreatMap 
@@ -647,8 +647,8 @@ export default function SecurityOverview({
               ))}
             </div>
 
-            {/* Live Network Event Stream */}
-            <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md h-[270px] flex flex-col justify-between">
+            {/* Live Network Event Stream (Expands to fill entire column area) */}
+            <div className="bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex-1 min-h-[360px] flex flex-col justify-between">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                   LIVE NETWORK EVENT STREAM (Real-Time)
@@ -752,9 +752,9 @@ export default function SecurityOverview({
           {/* ========================================================= */}
           {/* COLUMN 3 (RIGHT, 4 cols): Stats, Traffic Waveform, Terminal*/}
           {/* ========================================================= */}
-          <div className="lg:col-span-4 space-y-3">
+          <div className="lg:col-span-4 space-y-3 flex flex-col justify-between">
             {/* Box 1: Live Attack Statistics */}
-            <div className="h-[185px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
+            <div className="h-[190px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
               <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                   LIVE ATTACK STATISTICS
@@ -834,7 +834,7 @@ export default function SecurityOverview({
             </div>
 
             {/* Box 2: Real-Time Network Traffic Graph */}
-            <div className="h-[185px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
+            <div className="h-[190px] bg-[#070D19] border border-cyan-900/30 rounded-xl p-3 shadow-md flex flex-col justify-between">
               <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                   REAL-TIME NETWORK TRAFFIC
@@ -858,7 +858,7 @@ export default function SecurityOverview({
                 </div>
               </div>
 
-              <div className="h-[135px] w-full pt-1">
+              <div className="h-[140px] w-full pt-1">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={trafficData}>
                     <defs>
@@ -883,8 +883,8 @@ export default function SecurityOverview({
               </div>
             </div>
 
-            {/* Box 3: Live Terminal (IDS Engine) */}
-            <div className="h-[270px]">
+            {/* Box 3: Live Terminal (Expands to fill entire column height) */}
+            <div className="flex-1 min-h-[350px]">
               <LiveTerminal 
                 liveEvents={liveEvents} 
                 liveAlerts={liveAlerts}

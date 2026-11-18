@@ -70,7 +70,7 @@ export default function LiveTerminal({ liveEvents = [], liveAlerts = [], current
   }, [logs]);
 
   return (
-    <div className="bg-[#050811] border border-cyan-900/40 rounded-xl p-4 flex flex-col h-[280px] shadow-[0_4px_25px_rgba(0,0,0,0.8)]">
+    <div className="bg-[#050811] border border-cyan-900/40 rounded-xl p-4 flex flex-col h-full min-h-[300px] shadow-[0_4px_25px_rgba(0,0,0,0.8)]">
       {/* Terminal Title Bar */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 select-none">
         <div className="flex items-center space-x-2">
