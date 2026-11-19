@@ -627,6 +627,28 @@ def generate_report():
             t_gantt.rows[r_idx].cells[c_idx].text = val
     style_table(t_gantt, [Inches(2.5), Inches(0.5), Inches(0.5), Inches(0.5), Inches(0.5), Inches(0.5), Inches(0.5), Inches(0.5), Inches(0.5)])
 
+    # Visual Gantt Chart Graphic
+    gantt_img_path = os.path.join(DOC_DIR, "cybersoc_gantt_chart.png")
+    if os.path.exists(gantt_img_path):
+        p_gimg = doc.add_paragraph()
+        p_gimg.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_gimg.paragraph_format.space_before = Pt(6)
+        p_gimg.paragraph_format.space_after = Pt(2)
+        p_gimg.paragraph_format.keep_with_next = True
+        r_gi = p_gimg.add_run()
+        r_gi.add_picture(gantt_img_path, width=Inches(6.2))
+
+        p_gcap = doc.add_paragraph()
+        p_gcap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_gcap.paragraph_format.space_before = Pt(2)
+        p_gcap.paragraph_format.space_after = Pt(6)
+        r_gcap = p_gcap.add_run("Figure 7.1: Visual 16-Week Engineering Gantt Chart and Milestone Roadmap")
+        r_gcap.font.name = "Times New Roman"
+        r_gcap.font.size = Pt(9.5)
+        r_gcap.font.bold = True
+        r_gcap.font.italic = True
+        r_gcap.font.color.rgb = RGBColor(15, 41, 66)
+
     h2("7.3 Verified Implementation Status (10/10 Verified Tests)")
     para("Prior to IA-1 submission, the system underwent empirical validation across ten real-world scenarios via `scripts/verify_real_system.py`, achieving a 100% pass rate:")
     bullet("Live capture verified on Windows Loopback (`\\Device\\NPF_Loopback`) and Intel Wi-Fi physical NIC.", bold_prefix="Test 1: Scapy Packet Sniffer: ")
