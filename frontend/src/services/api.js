@@ -331,3 +331,32 @@ export const createWebSocketSubscription = (onMessage, onStatusChange) => {
     if (ws) ws.close();
   };
 };
+
+/**
+ * Academic Attack Simulator & AI Defense Verification Endpoints
+ */
+export const fetchAttackScenarios = async () => {
+  const res = await fetch(`${API_BASE}/simulator/scenarios`);
+  if (!res.ok) throw new Error('Failed to fetch attack scenarios');
+  return res.json();
+};
+
+export const launchAttackSimulation = async (scenarioData) => {
+  const res = await fetch(`${API_BASE}/simulator/launch-attack`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(scenarioData),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to launch attack simulation' }));
+    throw new Error(err.detail || 'Failed to launch attack simulation');
+  }
+  return res.json();
+};
+
+export const fetchGuideEvaluationSummary = async () => {
+  const res = await fetch(`${API_BASE}/simulator/guide-summary`);
+  if (!res.ok) throw new Error('Failed to fetch guide evaluation summary');
+  return res.json();
+};
+

@@ -80,6 +80,13 @@ class AdvancedRuleEngine:
         self, src_ip: str, dst_ip: str, dst_port: int, window_sec: float = 5.0, min_unique_sources: int = 5, min_packets: int = 40
     ) -> Optional[Dict[str, Any]]:
         """Identify multi-source distributed traffic bursts targeting a single destination service."""
+        # Ignore broadcast, multicast (224.0.0.0/4, ff00::/8) and service discovery ports (mDNS, SSDP, LLMNR, DHCP)
+        if (
+            dst_ip.startswith(("224.", "239.", "255.", "ff02:", "ff05:", "ff01:"))
+            or dst_port in (5353, 1900, 5355, 67, 68)
+        ):
+            return None
+
         target_key = f"{dst_ip}:{dst_port}"
         now = time.time()
         cutoff = now - window_sec

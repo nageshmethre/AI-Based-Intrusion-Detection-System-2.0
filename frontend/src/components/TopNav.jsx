@@ -8,7 +8,8 @@ import {
   HelpCircle,
   Clock,
   Crosshair,
-  Settings
+  Settings,
+  Zap
 } from 'lucide-react';
 
 export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount = 0 }) {
@@ -39,6 +40,7 @@ export default function TopNav({ activeTab, setActiveTab, wsStatus, alertCount =
 
   const navItems = [
     { id: 'overview', label: 'Live Monitor', icon: Activity },
+    { id: 'attack-simulator', label: '⚡ Attack Lab', icon: Zap },
     { id: 'threats', label: 'Threats', icon: Shield, badge: alertCount },
     { id: 'network-scanner', label: 'Scanner', icon: Crosshair },
     { id: 'ai-model', label: 'AI Model', icon: Cpu },

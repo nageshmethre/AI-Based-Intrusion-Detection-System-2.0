@@ -70,7 +70,7 @@ export default function LiveTerminal({ liveEvents = [], liveAlerts = [], current
   }, [logs]);
 
   return (
-    <div className="bg-[#050811] border border-cyan-900/40 rounded-xl p-3 flex flex-col h-[235px] shadow-[0_4px_25px_rgba(0,0,0,0.8)]">
+    <div className="bg-[#050811] border border-cyan-900/40 rounded-xl p-3 flex flex-col h-[235px] max-h-[235px] overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.8)]">
       {/* Terminal Title Bar */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 select-none">
         <div className="flex items-center space-x-2">
@@ -100,7 +100,7 @@ export default function LiveTerminal({ liveEvents = [], liveAlerts = [], current
       {/* Terminal Scroll Feed */}
       <div 
         ref={containerRef} 
-        className="flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed py-2.5 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-800"
+        className="flex-1 min-h-0 overflow-y-auto font-mono text-[11px] leading-relaxed py-2.5 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-800"
       >
         {logs.map((log) => {
           let colorClass = 'text-slate-300';

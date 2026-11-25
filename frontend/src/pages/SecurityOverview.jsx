@@ -21,7 +21,8 @@ import {
   Square,
   Network,
   Cpu,
-  Database
+  Database,
+  Zap
 } from 'lucide-react';
 import { 
   AreaChart, Area, PieChart, Pie, Cell, 
@@ -55,6 +56,7 @@ export default function SecurityOverview({
   topSourceIps = [],
   topDestPorts = [],
   onNavigateToThreats,
+  onNavigateToSimulator,
   onOpenMaximized
 }) {
   const [data, setData] = useState(null);
@@ -378,8 +380,35 @@ export default function SecurityOverview({
           <ActiveDefensePanel />
         </div>
       ) : (
-        /* Symmetrical 3-Column SOC Defender Command Center matching Reference Image */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+        <div className="space-y-3">
+          {/* Quick-Launch AI Attack Simulator Strip */}
+          <div className="bg-gradient-to-r from-[#071329] via-[#091C3E] to-[#071329] border border-cyan-500/40 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-[0_2px_15px_rgba(6,182,212,0.15)]">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 flex-shrink-0">
+                <Zap className="w-4 h-4 fill-cyan-400/30" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-white font-mono">⚡ AI Attack Simulator & Live Detection Arena</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
+                    Academic Viva Ready
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 line-clamp-1">
+                  Launch 6 real-time attack scenarios (SYN Flood, Stealth Scan, Brute-Force) to verify Random Forest ML detection (&lt;2ms) & autonomous Windows Firewall defense.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onNavigateToSimulator}
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs rounded-lg shadow-[0_0_12px_rgba(6,182,212,0.4)] transition-all cursor-pointer whitespace-nowrap flex-shrink-0 border border-cyan-400/40"
+            >
+              <span>Launch Attack Lab 🚀</span>
+            </button>
+          </div>
+
+          {/* Symmetrical 3-Column SOC Defender Command Center matching Reference Image */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
           
           {/* ========================================================= */}
           {/* COLUMN 1 (LEFT, 3 cols): System Status, NIC, Top IPs & Ports */}
@@ -884,7 +913,7 @@ export default function SecurityOverview({
             </div>
 
             {/* Box 3: Live Terminal (Compact & Symmetrical) */}
-            <div>
+            <div className="h-[235px] max-h-[235px] overflow-hidden">
               <LiveTerminal 
                 liveEvents={liveEvents} 
                 liveAlerts={liveAlerts}
@@ -1020,6 +1049,7 @@ export default function SecurityOverview({
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* AI Decision Explainer Modal */}

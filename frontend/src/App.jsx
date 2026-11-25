@@ -5,6 +5,7 @@ import LiveMonitoring from './pages/LiveMonitoring';
 import ThreatDetection from './pages/ThreatDetection';
 import NetworkScanner from './pages/NetworkScanner';
 import WebAttackScanner from './pages/WebAttackScanner';
+import AttackSimulatorPage from './pages/AttackSimulatorPage';
 import ModelPerformance from './pages/ModelPerformance';
 import SecurityLogs from './pages/SecurityLogs';
 import SettingsPage from './pages/SettingsPage';
@@ -167,8 +168,12 @@ export default function App() {
               topSourceIps={topSourceIps}
               topDestPorts={topDestPorts}
               onNavigateToThreats={() => setActiveTab('threats')} 
+              onNavigateToSimulator={() => setActiveTab('attack-simulator')}
               onOpenMaximized={(panel) => setMaximizedPanel(panel)}
             />
+          )}
+          {activeTab === 'attack-simulator' && (
+            <AttackSimulatorPage onNavigateToThreats={() => setActiveTab('threats')} />
           )}
           {activeTab === 'monitoring' && (
             <LiveMonitoring liveEvents={liveEvents} />

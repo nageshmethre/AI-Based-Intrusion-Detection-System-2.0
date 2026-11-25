@@ -114,6 +114,12 @@ class ActiveDefenseManager:
             return True
         if clean_ip in get_local_machine_ips():
             return True
+        try:
+            addr = ipaddress.ip_address(clean_ip)
+            if addr.is_multicast or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                return True
+        except ValueError:
+            pass
         return False
 
     def block_ip(
